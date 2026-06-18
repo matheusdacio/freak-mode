@@ -26,25 +26,26 @@ interface ProgressaoExercicio {
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (treino(); as t) {
-      <header class="topo">
+      <header class="topo anim-in">
         <button class="voltar" (click)="voltar()">← Treinos</button>
         <p class="kicker">PROGRESSÃO</p>
         <h1>{{ t.nome }}</h1>
-        <p class="muted">
+        <p class="sessoes-info muted">
           {{ sessoes().length }}
           {{ sessoes().length === 1 ? 'sessão registrada' : 'sessões registradas' }}
         </p>
       </header>
 
       @if (sessoes().length === 0) {
-        <p class="muted vazio">
-          Nenhuma sessão ainda. Execute o treino para começar a registrar.
-        </p>
-        <button class="btn btn-primary btn-block" (click)="executar()">
-          Iniciar execução →
-        </button>
+        <div class="vazio anim-in">
+          <span class="vazio-emoji">📊</span>
+          <p class="muted">Nenhuma sessão ainda.<br />Execute o treino para começar a registrar.</p>
+          <button class="btn btn-primary btn-block" (click)="executar()">
+            Iniciar execução →
+          </button>
+        </div>
       } @else {
-        <div class="seletor">
+        <div class="seletor anim-in">
           <button
             class="opcao"
             [class.ativa]="metrica() === 'carga'"
@@ -61,8 +62,8 @@ interface ProgressaoExercicio {
           </button>
         </div>
 
-        @for (p of progressao(); track p.nome) {
-          <section class="card">
+        @for (p of progressao(); track p.nome; let i = $index) {
+          <section class="card anim-in" [style.animation-delay.ms]="i * 60">
             <div class="cabecalho">
               <h2>{{ p.nome }}</h2>
               <span class="atual">{{ p.valores.at(-1) }}</span>
@@ -76,22 +77,27 @@ interface ProgressaoExercicio {
         </button>
       }
     } @else {
-      <p class="muted">Carregando…</p>
+      <p class="muted carregando">Carregando…</p>
     }
   `,
   styles: [
     `
       .topo {
-        padding: 1.5rem 0 1rem;
+        padding: 1.5rem 0 1.25rem;
       }
       .voltar {
         color: var(--muted);
         font-size: 0.9rem;
+        padding: 0.2rem 0;
+        margin-bottom: 0.9rem;
+        display: block;
+      }
+      .voltar:active {
+        color: var(--accent-2);
       }
       .kicker {
-        margin-top: 0.75rem;
-        font-size: 0.75rem;
-        letter-spacing: 0.25em;
+        font-size: 0.7rem;
+        letter-spacing: 0.4em;
         color: var(--accent);
         font-weight: 700;
       }
@@ -99,14 +105,36 @@ interface ProgressaoExercicio {
         font-family: var(--font-display);
         font-size: 2.6rem;
         line-height: 0.95;
+        text-transform: uppercase;
+        margin-top: 0.25rem;
+      }
+      .sessoes-info {
+        font-size: 0.85rem;
+        margin-top: 0.3rem;
       }
       .vazio {
-        padding: 2rem 0 1rem;
+        text-align: center;
+        padding: 2.5rem 1rem 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        align-items: center;
+      }
+      .vazio-emoji {
+        font-size: 2.5rem;
+      }
+      .vazio p {
+        line-height: 1.5;
+      }
+      .carregando {
+        text-align: center;
+        padding: 2rem;
       }
       .seletor {
         display: flex;
-        gap: 0.4rem;
-        background: var(--surface-2);
+        gap: 0.3rem;
+        background: var(--surface);
+        border: 1px solid var(--line);
         padding: 0.3rem;
         border-radius: 999px;
         margin-bottom: 1.25rem;
@@ -118,13 +146,15 @@ interface ProgressaoExercicio {
         font-size: 0.85rem;
         font-weight: 600;
         color: var(--muted);
+        transition: color 0.15s ease;
       }
       .opcao.ativa {
-        background: var(--accent);
-        color: #0a0b0a;
+        background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dim) 100%);
+        color: #fff;
+        box-shadow: 0 4px 16px -4px var(--accent-glow);
       }
       .card {
-        background: var(--surface);
+        background: linear-gradient(160deg, var(--surface) 0%, var(--surface-2) 140%);
         border: 1px solid var(--line);
         border-radius: var(--radius);
         padding: 1rem;
@@ -135,19 +165,26 @@ interface ProgressaoExercicio {
         align-items: baseline;
         justify-content: space-between;
         margin-bottom: 0.5rem;
+        gap: 0.5rem;
       }
       h2 {
         font-family: var(--font-display);
         font-size: 1.3rem;
         letter-spacing: 0.02em;
+        text-transform: uppercase;
       }
       .atual {
         font-family: var(--font-display);
-        font-size: 1.6rem;
-        color: var(--accent);
+        font-size: 1.7rem;
+        background: linear-gradient(135deg, var(--accent-2) 0%, var(--accent) 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        flex-shrink: 0;
       }
       .executar {
         margin-top: 0.5rem;
+        margin-bottom: 1rem;
       }
     `,
   ],

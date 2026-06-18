@@ -12,6 +12,13 @@ interface Ponto {
   template: `
     @if (pontos().length >= 2) {
       <svg [attr.viewBox]="viewBox" preserveAspectRatio="none" class="grafico">
+        <defs>
+          <linearGradient id="freakFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.32" />
+            <stop offset="100%" stop-color="var(--accent)" stop-opacity="0" />
+          </linearGradient>
+        </defs>
+        <polygon [attr.points]="area()" fill="url(#freakFill)" />
         <polyline
           [attr.points]="linha()"
           fill="none"
@@ -21,8 +28,13 @@ interface Ponto {
           stroke-linejoin="round"
           stroke-linecap="round"
         />
-        @for (p of pontos(); track $index) {
-          <circle [attr.cx]="p.cx" [attr.cy]="p.cy" r="3" fill="var(--accent)" />
+        @for (p of pontos(); track $index; let ultimo = $last) {
+          <circle
+            [attr.cx]="p.cx"
+            [attr.cy]="p.cy"
+            [attr.r]="ultimo ? 4 : 2.5"
+            [attr.fill]="ultimo ? 'var(--accent-2)' : 'var(--accent)'"
+          />
         }
       </svg>
       <div class="rotulos muted">
@@ -42,14 +54,14 @@ interface Ponto {
       }
       .grafico {
         width: 100%;
-        height: 90px;
+        height: 96px;
         display: block;
       }
       .rotulos {
         display: flex;
         justify-content: space-between;
         font-size: 0.7rem;
-        margin-top: 0.25rem;
+        margin-top: 0.3rem;
       }
       .insuficiente {
         font-size: 0.85rem;
@@ -88,5 +100,9 @@ export class LineChartComponent {
     this.pontos()
       .map((p) => `${p.cx},${p.cy}`)
       .join(' '),
+  );
+
+  protected readonly area = computed(
+    () => `0,${this.altura} ${this.linha()} ${this.largura},${this.altura}`,
   );
 }

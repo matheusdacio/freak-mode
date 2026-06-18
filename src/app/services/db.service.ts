@@ -1,77 +1,42 @@
-import { Injectable } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
+import { collection, deleteDoc, doc, getDoc, getDocs, setDoc } from 'firebase/firestore';
+import { AuthService } from '@services/auth.service';
+import { FirebaseService } from '@services/firebase.service';
 
 export type StoreName = 'treinos' | 'sessoes';
 
-const DB_NAME = 'treino-app';
-const DB_VERSION = 1;
-
 @Injectable({ providedIn: 'root' })
 export class DbService {
-  private dbPromise: Promise<IDBDatabase> | null = null;
+  private readonly firebase = inject(FirebaseService);
+  private readonly auth = inject(AuthService);
 
-  private open(): Promise<IDBDatabase> {
-    if (this.dbPromise) {
-      return this.dbPromise;
-    }
-
-    this.dbPromise = new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-      request.onupgradeneeded = () => {
-        const db = request.result;
-        if (!db.objectStoreNames.contains('treinos')) {
-          db.createObjectStore('treinos', { keyPath: 'id' });
-        }
-        if (!db.objectStoreNames.contains('sessoes')) {
-          const store = db.createObjectStore('sessoes', { keyPath: 'id' });
-          store.createIndex('porTreino', 'treinoId', { unique: false });
-        }
-      };
-
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-
-    return this.dbPromise;
+  private uid(): string {
+    const uid = this.auth.usuario()?.uid;
+    if (!uid) throw new Error('Não autenticado');
+    return uid;
   }
 
   async getAll<T>(store: StoreName): Promise<T[]> {
-    const db = await this.open();
-    return new Promise<T[]>((resolve, reject) => {
-      const tx = db.transaction(store, 'readonly');
-      const req = tx.objectStore(store).getAll();
-      req.onsuccess = () => resolve(req.result as T[]);
-      req.onerror = () => reject(req.error);
-    });
+    const col = collection(this.firebase.db, 'users', this.uid(), store);
+    const snap = await getDocs(col);
+    return snap.docs.map(d => d.data() as T);
   }
 
   async get<T>(store: StoreName, id: string): Promise<T | undefined> {
-    const db = await this.open();
-    return new Promise<T | undefined>((resolve, reject) => {
-      const tx = db.transaction(store, 'readonly');
-      const req = tx.objectStore(store).get(id);
-      req.onsuccess = () => resolve(req.result as T | undefined);
-      req.onerror = () => reject(req.error);
-    });
+    const ref = doc(this.firebase.db, 'users', this.uid(), store, id);
+    const snap = await getDoc(ref);
+    return snap.exists() ? (snap.data() as T) : undefined;
   }
 
-  async put<T>(store: StoreName, value: T): Promise<void> {
-    const db = await this.open();
-    return new Promise<void>((resolve, reject) => {
-      const tx = db.transaction(store, 'readwrite');
-      tx.objectStore(store).put(value);
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-    });
+  async put<T extends { id: string }>(store: StoreName, value: T): Promise<void> {
+    const ref = doc(this.firebase.db, 'users', this.uid(), store, value.id);
+    // JSON round-trip remove undefined values que o Firestore não aceita
+    const data = JSON.parse(JSON.stringify(value)) as T;
+    await setDoc(ref, data);
   }
 
   async delete(store: StoreName, id: string): Promise<void> {
-    const db = await this.open();
-    return new Promise<void>((resolve, reject) => {
-      const tx = db.transaction(store, 'readwrite');
-      tx.objectStore(store).delete(id);
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-    });
+    const ref = doc(this.firebase.db, 'users', this.uid(), store, id);
+    await deleteDoc(ref);
   }
 }

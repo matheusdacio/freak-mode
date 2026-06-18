@@ -20,4 +20,12 @@ export interface Sessao {
   /** Ordem incremental da sessão para aquele treino (1ª, 2ª, 3ª...). Usada nos relatórios. */
   ordem: number;
   itens: ItemSessao[];
+  /** Data de início da sessão no formato YYYY-MM-DD. Usada para cálculo de streak. */
+  data?: string;
+  /**
+   * 'rascunho': em andamento, não conta nas métricas.
+   * 'concluida': finalizada, conta em tudo.
+   * undefined: sessão antiga (compatibilidade) — tratada como concluída.
+   */
+  status?: 'rascunho' | 'concluida';
 }

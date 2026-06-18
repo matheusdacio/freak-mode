@@ -16,7 +16,10 @@
             "index": "src/index.html",
             "browser": "src/main.ts",
             "tsConfig": "tsconfig.app.json",
-            "assets": [],
+            "assets": [
+              { "glob": "manifest.webmanifest", "input": "src", "output": "/" },
+              { "glob": "**/*", "input": "src/assets", "output": "assets" }
+            ],
             "styles": ["src/styles.css"],
             "scripts": []
           },
@@ -24,7 +27,7 @@
             "production": {
               "optimization": { "scripts": true, "styles": true, "fonts": false },
               "budgets": [
-                { "type": "initial", "maximumWarning": "500kb", "maximumError": "1mb" }
+                { "type": "initial", "maximumWarning": "750kb", "maximumError": "1mb" }
               ],
               "outputHashing": "all"
             },

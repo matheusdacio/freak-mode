@@ -4,4 +4,6 @@ export interface Treino {
   readonly id: string;
   nome: string;
   exercicios: Exercicio[];
+  ordem?: number;
+  capa?: string;
 }

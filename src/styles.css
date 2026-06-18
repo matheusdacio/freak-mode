@@ -1,15 +1,19 @@
 :root {
-  --bg: #0a0b0a;
-  --surface: #141614;
-  --surface-2: #1c1f1b;
-  --line: #2a2e28;
-  --text: #f2f4ef;
-  --muted: #8b918a;
-  --accent: #d4ff3f;
-  --accent-dim: #aacb2f;
+  --bg: #08070c;
+  --surface: #14111c;
+  --surface-2: #1d1927;
+  --line: rgba(255, 255, 255, 0.07);
+  --line-strong: rgba(255, 255, 255, 0.14);
+  --text: #f4f2f8;
+  --muted: #8e8a9b;
+  --accent: #a855f7;
+  --accent-2: #c084fc;
+  --accent-dim: #7c3aed;
+  --accent-glow: rgba(168, 85, 247, 0.35);
+  --accent-soft: rgba(168, 85, 247, 0.1);
   --danger: #ff5a52;
-  --radius: 16px;
-  --radius-sm: 10px;
+  --radius: 18px;
+  --radius-sm: 12px;
   --font-display: 'Anton', sans-serif;
   --font-body: 'Archivo', sans-serif;
 }
@@ -31,7 +35,10 @@ body {
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
   font-feature-settings: 'tnum';
-  background-image: radial-gradient(circle at 50% -10%, #1a1d18 0%, var(--bg) 55%);
+  background-image:
+    radial-gradient(ellipse 75% 45% at 50% -8%, rgba(124, 58, 237, 0.22), transparent 65%),
+    radial-gradient(ellipse 55% 35% at 90% 108%, rgba(124, 58, 237, 0.09), transparent 60%);
+  background-attachment: fixed;
 }
 
 input,
@@ -53,33 +60,32 @@ button {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  padding: 0.85rem 1.2rem;
+  padding: 0.9rem 1.2rem;
   border-radius: var(--radius-sm);
   font-weight: 700;
   font-size: 0.95rem;
-  letter-spacing: 0.02em;
-  transition: transform 0.08s ease, background 0.15s ease, opacity 0.15s ease;
+  letter-spacing: 0.03em;
+  transition: transform 0.08s ease, box-shadow 0.2s ease, opacity 0.15s ease;
 }
 .btn:active {
   transform: scale(0.97);
 }
 .btn-primary {
-  background: var(--accent);
-  color: #0a0b0a;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dim) 100%);
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  box-shadow: 0 6px 24px -6px var(--accent-glow);
 }
 .btn-primary:disabled {
-  opacity: 0.4;
+  opacity: 0.35;
   cursor: not-allowed;
+  box-shadow: none;
 }
 .btn-ghost {
   background: var(--surface-2);
   color: var(--text);
-  border: 1px solid var(--line);
-}
-.btn-danger {
-  background: transparent;
-  color: var(--danger);
-  border: 1px solid var(--danger);
+  border: 1px solid var(--line-strong);
 }
 .btn-block {
   width: 100%;
@@ -90,15 +96,57 @@ button {
   background: var(--surface-2);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  padding: 0.8rem 0.9rem;
+  padding: 0.85rem 0.95rem;
   font-size: 1rem;
   outline: none;
-  transition: border-color 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.field::placeholder {
+  color: var(--muted);
+  opacity: 0.7;
 }
 .field:focus {
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 .muted {
   color: var(--muted);
+}
+
+/* ---- Entrada animada ---- */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.anim-in {
+  animation: rise 0.4s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+
+/* ---- CDK drag-drop ---- */
+.cdk-drag-preview {
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6), 0 0 24px var(--accent-glow);
+  opacity: 0.97;
+}
+
+.cdk-drag-placeholder {
+  opacity: 0;
+}
+
+.cdk-drag-animating {
+  transition: transform 250ms ease;
+}
+
+.cdk-drop-list-dragging .card:not(.cdk-drag-placeholder),
+.cdk-drop-list-dragging .ex:not(.cdk-drag-placeholder) {
+  transition: transform 250ms ease;
 }
