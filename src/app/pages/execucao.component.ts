@@ -80,11 +80,12 @@ import { TreinoService } from '@services/treino.service';
                 </span>
                 <input
                   class="cell"
+                  [class.com-ref]="serie.peso === null && serie.pesoAnterior != null"
                   type="number"
                   inputmode="decimal"
                   [value]="serie.peso ?? ''"
                   (input)="setPeso(ei, si, $event)"
-                  placeholder="—"
+                  [placeholder]="serie.pesoAnterior != null ? serie.pesoAnterior : '—'"
                 />
                 <input
                   class="cell"
@@ -317,6 +318,17 @@ import { TreinoService } from '@services/treino.service';
       .cell:focus {
         border-color: var(--accent);
         box-shadow: 0 0 0 3px var(--accent-soft);
+      }
+      /* Peso anterior exibido apagado, só como referência */
+      .cell.com-ref::placeholder {
+        color: var(--accent-2);
+        opacity: 0.32;
+        font-weight: 700;
+      }
+      .cell::placeholder {
+        color: var(--muted);
+        opacity: 0.5;
+        font-weight: 400;
       }
       .notas {
         margin-top: 0.6rem;

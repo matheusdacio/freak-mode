@@ -2,6 +2,8 @@
 export interface RegistroSerie {
   peso: number | null;
   reps: number | null;
+  /** Peso usado nesta série na última sessão — exibido apagado como referência. Não conta como valor preenchido. */
+  pesoAnterior?: number | null;
 }
 
 /** Execução de um exercício dentro de uma sessão. */

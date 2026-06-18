@@ -34,8 +34,9 @@ export class SessaoService {
   }
 
   /**
-   * Monta uma nova sessão a partir do treino atual, pré-preenchendo peso/reps
-   * com os valores da última sessão concluída (ou com as reps padrão do exercício).
+   * Monta uma nova sessão a partir do treino atual. O peso começa VAZIO (sessão
+   * nova e limpa), mas o peso da última sessão fica guardado em `pesoAnterior`
+   * para ser exibido apagado como referência. As reps já vêm pré-preenchidas.
    */
   async novaSessao(treino: Treino): Promise<Sessao> {
     const anterior = await this.ultima(treino.id);
@@ -46,8 +47,9 @@ export class SessaoService {
       const series: RegistroSerie[] = Array.from({ length: ex.series }, (_, idx) => {
         const ref = itemAnterior?.series[idx];
         return {
-          peso: ref?.peso ?? null,
+          peso: null,
           reps: ref?.reps ?? (ex.reps && ex.reps > 0 ? ex.reps : null),
+          pesoAnterior: ref?.peso ?? null,
         };
       });
       return { exercicioId: ex.id, nomeExercicio: ex.nome, series, notas: '' };
