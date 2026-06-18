@@ -21,7 +21,7 @@ const ERROS: Record<string, string> = {
     <div class="tela">
       <div class="hero anim-in">
         <div class="halo"></div>
-        <img class="logo" src="assets/icons/icon-512.png" alt="FreakMode" />
+        <img class="logo" src="assets/icons/logo.png" alt="FreakMode" />
       </div>
 
       <h1 class="anim-in">FREAK<span>MODE</span></h1>
