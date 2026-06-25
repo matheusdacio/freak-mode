@@ -3,7 +3,15 @@ import { collection, deleteDoc, doc, getDoc, getDocs, setDoc } from 'firebase/fi
 import { AuthService } from '@services/auth.service';
 import { FirebaseService } from '@services/firebase.service';
 
-export type StoreName = 'treinos' | 'sessoes';
+export type StoreName =
+  | 'treinos'
+  | 'sessoes'
+  | 'alimentos'
+  | 'dieta'
+  | 'pesos'
+  | 'agua'
+  | 'medidas'
+  | 'config';
 
 @Injectable({ providedIn: 'root' })
 export class DbService {

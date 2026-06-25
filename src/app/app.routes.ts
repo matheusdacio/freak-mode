@@ -10,8 +10,24 @@ export const routes: Routes = [
   {
     path: '',
     canActivate: [authGuard],
-    loadComponent: () =>
-      import('./pages/treinos.component').then(m => m.TreinosComponent),
+    loadComponent: () => import('./pages/tabs.component').then(m => m.TabsComponent),
+    children: [
+      {
+        path: '',
+        loadComponent: () =>
+          import('./pages/treinos.component').then(m => m.TreinosComponent),
+      },
+      {
+        path: 'dieta',
+        loadComponent: () =>
+          import('./pages/dieta.component').then(m => m.DietaComponent),
+      },
+      {
+        path: 'corpo',
+        loadComponent: () =>
+          import('./pages/corpo.component').then(m => m.CorpoComponent),
+      },
+    ],
   },
   {
     path: 'treino/:id',
