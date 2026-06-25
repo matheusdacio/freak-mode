@@ -8,6 +8,7 @@ export type StoreName =
   | 'sessoes'
   | 'alimentos'
   | 'dieta'
+  | 'adesao'
   | 'pesos'
   | 'agua'
   | 'medidas'

@@ -8,7 +8,14 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DietaService } from '@services/dieta.service';
-import { Alimento, DiaDieta, MetasDieta } from '@models/dieta.model';
+import {
+  Alimento,
+  DiaAdesao,
+  DietaPlano,
+  Macros,
+  MetasDieta,
+  Refeicao,
+} from '@models/dieta.model';
 
 type Overlay = 'none' | 'add' | 'metas';
 type ModoAdd = 'lib' | 'novo';
@@ -19,73 +26,121 @@ type ModoAdd = 'lib' | 'novo';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header class="topo anim-in">
-      <p class="kicker">NUTRIÇÃO</p>
       <div class="topo-linha">
-        <h1>DIETA</h1>
-        <button class="btn-metas" (click)="abrirMetas()">⚙️ Metas</button>
+        <div>
+          <p class="kicker">NUTRIÇÃO</p>
+          <h1>MINHA DIETA</h1>
+        </div>
+        <div class="acoes-topo">
+          <button class="btn-top" (click)="abrirMetas()" title="Metas">⚙️</button>
+          <button class="btn-top" [class.ativo]="editando()" (click)="editando.set(!editando())">
+            {{ editando() ? '✓ Concluir' : '✎ Editar' }}
+          </button>
+        </div>
       </div>
     </header>
 
-    <!-- Navegação de dia -->
-    <div class="dia-nav anim-in">
-      <button class="seta" (click)="mudarDia(-1)">‹</button>
-      <span class="dia-label">{{ labelData() }}</span>
-      <button class="seta" (click)="mudarDia(1)" [disabled]="ehHoje()">›</button>
-    </div>
+    @if (plano(); as p) {
+      @if (!editando()) {
+        <div class="dia-nav anim-in">
+          <button class="seta" (click)="mudarDia(-1)">‹</button>
+          <span class="dia-label">{{ labelData() }}</span>
+          <button class="seta" (click)="mudarDia(1)" [disabled]="ehHoje()">›</button>
+        </div>
+      }
 
-    @if (dia(); as d) {
-      <!-- Resumo de macros -->
-      <section class="resumo anim-in">
-        @for (m of totais(); track m.key) {
-          <div class="macro">
-            <div class="macro-topo">
-              <span class="macro-label">{{ m.label }}</span>
-              <span class="macro-val">
-                <strong>{{ m.atual }}</strong>/{{ m.meta }}{{ m.un }}
-              </span>
-            </div>
-            <div class="trilha">
-              <div
-                class="fill"
-                [class.fill--estourou]="m.atual > m.meta && m.meta > 0"
-                [style.width.%]="m.pct"
-              ></div>
-            </div>
+      <!-- Dashboard de macros -->
+      <section class="dash anim-in">
+        <div class="ring-wrap">
+          <svg viewBox="0 0 120 120" class="ring">
+            <circle class="ring-bg" cx="60" cy="60" r="52" />
+            <circle
+              class="ring-fg"
+              cx="60"
+              cy="60"
+              r="52"
+              [attr.stroke-dasharray]="CIRC"
+              [attr.stroke-dashoffset]="ringOffset()"
+              transform="rotate(-90 60 60)"
+            />
+          </svg>
+          <div class="ring-center">
+            <span class="ring-num">{{ atual().kcal }}</span>
+            <span class="ring-meta">/ {{ metas().kcal }}</span>
+            <span class="ring-cap">kcal</span>
           </div>
-        }
+        </div>
+        <div class="barras">
+          @for (b of barras(); track b.label) {
+            <div class="barra">
+              <div class="barra-top">
+                <span class="barra-label">{{ b.label }}</span>
+                <span class="barra-val"><strong>{{ b.atual }}</strong>/{{ b.meta }}{{ b.un }}</span>
+              </div>
+              <div class="trilha">
+                <div
+                  class="fill"
+                  [class.fill--estourou]="b.atual > b.meta && b.meta > 0"
+                  [style.width.%]="b.pct"
+                ></div>
+              </div>
+            </div>
+          }
+        </div>
       </section>
+      <p class="dash-cap muted">
+        {{ editando() ? 'Total do plano fixo' : 'Consumido · ' + labelData().toLowerCase() }}
+      </p>
 
-      <!-- Refeições -->
-      @for (r of d.refeicoes; track r.id) {
-        <section class="refeicao anim-in">
-          <div class="ref-cabecalho">
+      <!-- Refeições do plano -->
+      @for (r of p.refeicoes; track r.id) {
+        <section class="ref anim-in">
+          <div class="ref-head">
             <h2>{{ r.nome }}</h2>
-            <span class="ref-kcal">{{ totalKcalRefeicao(r.id) }} kcal</span>
+            @if (editando()) {
+              <button class="ref-remover" (click)="removerRefeicao(r.id)">remover</button>
+            } @else {
+              <span class="ref-meta">
+                {{ comidosNaRef(r) }}/{{ r.itens.length }} · {{ totalKcalRefeicao(r.id) }} kcal
+              </span>
+            }
           </div>
 
           @for (it of r.itens; track it.id) {
-            <div class="item">
+            <div class="item" [class.feito]="!editando() && estaComido(it.id)">
+              @if (editando()) {
+                <button class="item-x" (click)="removerItem(r.id, it.id)">✕</button>
+              } @else {
+                <button class="check" [class.on]="estaComido(it.id)" (click)="toggleComido(it.id)">
+                  @if (estaComido(it.id)) {✓}
+                </button>
+              }
               <div class="item-info">
                 <span class="item-nome">{{ it.nome }}</span>
                 <span class="item-sub muted">
-                  {{ it.quantidade }}× {{ it.porcao }} · {{ it.proteina }}P
-                  {{ it.carbo }}C {{ it.gordura }}G
+                  {{ it.quantidade }}× {{ it.porcao }} · {{ it.proteina }}P {{ it.carbo }}C {{ it.gordura }}G
                 </span>
               </div>
               <span class="item-kcal">{{ it.kcal }}</span>
-              <button class="item-x" (click)="removerItem(r.id, it.id)">✕</button>
             </div>
           } @empty {
-            <p class="ref-vazio muted">Nada lançado ainda.</p>
+            <p class="ref-vazio muted">Sem alimentos nesta refeição.</p>
           }
 
-          <button class="add-item" (click)="abrirAdd(r.id)">＋ Adicionar alimento</button>
+          @if (editando()) {
+            <button class="add-item" (click)="abrirAdd(r.id)">＋ Adicionar alimento</button>
+          }
         </section>
       }
 
-      <button class="btn btn-ghost nova-ref" (click)="adicionarRefeicao()">
-        ＋ Nova refeição
-      </button>
+      @if (editando()) {
+        <button class="btn btn-ghost nova-ref" (click)="adicionarRefeicao()">＋ Nova refeição</button>
+      } @else if (semItens()) {
+        <div class="vazio anim-in">
+          <span class="vazio-emoji">🥗</span>
+          <p class="muted">Seu plano está vazio.<br />Toque em <strong>✎ Editar</strong> pra montar sua dieta.</p>
+        </div>
+      }
     } @else {
       <p class="muted carregando">Carregando…</p>
     }
@@ -107,19 +162,10 @@ type ModoAdd = 'lib' | 'novo';
         </div>
 
         @if (modoAdd() === 'lib') {
-          <input
-            class="field"
-            type="text"
-            placeholder="Buscar alimento…"
-            [(ngModel)]="busca"
-          />
+          <input class="field" type="text" placeholder="Buscar alimento…" [(ngModel)]="busca" />
           <div class="lista-alim">
             @for (a of alimentosFiltrados(); track a.id) {
-              <button
-                class="alim"
-                [class.sel]="alimentoSel()?.id === a.id"
-                (click)="alimentoSel.set(a)"
-              >
+              <button class="alim" [class.sel]="alimentoSel()?.id === a.id" (click)="alimentoSel.set(a)">
                 <span class="alim-nome">{{ a.nome }}</span>
                 <span class="alim-macro muted">
                   {{ a.kcal }}kcal · {{ a.proteina }}P {{ a.carbo }}C {{ a.gordura }}G / {{ a.porcao }}
@@ -187,95 +233,159 @@ type ModoAdd = 'lib' | 'novo';
   styles: [
     `
       .topo {
-        padding: 1.5rem 0 0.5rem;
-      }
-      .kicker {
-        font-size: 0.7rem;
-        letter-spacing: 0.4em;
-        color: var(--accent);
-        font-weight: 700;
+        padding: 1.4rem 0 0.6rem;
       }
       .topo-linha {
         display: flex;
-        align-items: center;
+        align-items: flex-start;
         justify-content: space-between;
         gap: 0.5rem;
       }
+      .kicker {
+        font-size: 0.66rem;
+        letter-spacing: 0.35em;
+        color: var(--accent);
+        font-weight: 700;
+      }
       h1 {
         font-family: var(--font-display);
-        font-size: 2.6rem;
+        font-size: 2.1rem;
         line-height: 0.95;
         text-transform: uppercase;
-        margin-top: 0.25rem;
+        margin-top: 0.2rem;
       }
-      .btn-metas {
-        font-size: 0.78rem;
+      .acoes-topo {
+        display: flex;
+        gap: 0.4rem;
+        flex-shrink: 0;
+      }
+      .btn-top {
+        font-size: 0.74rem;
         font-weight: 700;
         color: var(--muted);
         border: 1px solid var(--line);
         border-radius: 999px;
-        padding: 0.4rem 0.8rem;
+        padding: 0.4rem 0.7rem;
         background: var(--surface);
+        white-space: nowrap;
       }
-      .btn-metas:active {
-        color: var(--accent-2);
-        border-color: var(--accent-dim);
+      .btn-top.ativo {
+        color: #fff;
+        background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dim) 100%);
+        border-color: transparent;
       }
 
       .dia-nav {
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 1rem;
-        margin: 0.5rem 0 1.1rem;
+        gap: 0.8rem;
+        margin: 0.3rem 0 1rem;
       }
       .seta {
-        width: 2.2rem;
-        height: 2.2rem;
+        width: 2rem;
+        height: 2rem;
         border-radius: 999px;
         background: var(--surface);
         border: 1px solid var(--line);
-        font-size: 1.4rem;
+        font-size: 1.3rem;
         line-height: 1;
         color: var(--text);
       }
       .seta:disabled {
-        opacity: 0.35;
+        opacity: 0.3;
       }
       .dia-label {
         font-family: var(--font-display);
-        font-size: 1.2rem;
+        font-size: 1.1rem;
         text-transform: uppercase;
-        min-width: 5rem;
+        min-width: 4.5rem;
         text-align: center;
       }
 
-      .resumo {
+      /* ---- dashboard ---- */
+      .dash {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
         background: linear-gradient(160deg, var(--surface) 0%, var(--surface-2) 140%);
         border: 1px solid var(--line);
         border-radius: var(--radius);
         padding: 1rem;
-        margin-bottom: 1.1rem;
+      }
+      .ring-wrap {
+        position: relative;
+        width: 110px;
+        height: 110px;
+        flex-shrink: 0;
+      }
+      .ring {
+        width: 110px;
+        height: 110px;
+        transform: rotate(0);
+      }
+      .ring-bg {
+        fill: none;
+        stroke: var(--bg);
+        stroke-width: 11;
+      }
+      .ring-fg {
+        fill: none;
+        stroke: var(--accent);
+        stroke-width: 11;
+        stroke-linecap: round;
+        transition: stroke-dashoffset 0.4s ease;
+        filter: drop-shadow(0 0 5px var(--accent-glow));
+      }
+      .ring-center {
+        position: absolute;
+        inset: 0;
         display: flex;
         flex-direction: column;
-        gap: 0.7rem;
+        align-items: center;
+        justify-content: center;
+        gap: 0;
       }
-      .macro-topo {
+      .ring-num {
+        font-family: var(--font-display);
+        font-size: 1.7rem;
+        line-height: 1;
+      }
+      .ring-meta {
+        font-size: 0.72rem;
+        color: var(--muted);
+      }
+      .ring-cap {
+        font-size: 0.6rem;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--accent-2);
+        font-weight: 700;
+        margin-top: 0.15rem;
+      }
+      .barras {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.55rem;
+      }
+      .barra-top {
         display: flex;
         justify-content: space-between;
         align-items: baseline;
-        margin-bottom: 0.3rem;
-        font-size: 0.85rem;
+        font-size: 0.78rem;
+        margin-bottom: 0.25rem;
       }
-      .macro-label {
+      .barra-label {
         font-weight: 600;
       }
-      .macro-val strong {
+      .barra-val strong {
         font-family: var(--font-display);
-        font-size: 1.05rem;
+        font-size: 0.95rem;
       }
       .trilha {
-        height: 7px;
+        height: 6px;
         border-radius: 999px;
         background: var(--bg);
         overflow: hidden;
@@ -284,43 +394,88 @@ type ModoAdd = 'lib' | 'novo';
         height: 100%;
         border-radius: 999px;
         background: linear-gradient(90deg, var(--accent-dim) 0%, var(--accent) 100%);
-        box-shadow: 0 0 8px var(--accent-glow);
         transition: width 0.3s ease;
       }
       .fill--estourou {
         background: linear-gradient(90deg, #b8860b 0%, var(--danger) 100%);
       }
+      .dash-cap {
+        text-align: center;
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin: 0.5rem 0 1.1rem;
+      }
 
-      .refeicao {
+      /* ---- refeições ---- */
+      .ref {
         background: linear-gradient(160deg, var(--surface) 0%, var(--surface-2) 140%);
         border: 1px solid var(--line);
         border-radius: var(--radius);
-        padding: 0.9rem 1rem;
-        margin-bottom: 0.8rem;
+        padding: 0.85rem 0.95rem;
+        margin-bottom: 0.7rem;
       }
-      .ref-cabecalho {
+      .ref-head {
         display: flex;
         align-items: baseline;
         justify-content: space-between;
-        margin-bottom: 0.5rem;
+        gap: 0.5rem;
+        margin-bottom: 0.4rem;
       }
       h2 {
         font-family: var(--font-display);
-        font-size: 1.25rem;
+        font-size: 1.15rem;
         text-transform: uppercase;
-        letter-spacing: 0.02em;
       }
-      .ref-kcal {
-        font-size: 0.8rem;
+      .ref-meta {
+        font-size: 0.74rem;
         color: var(--accent-2);
+        font-weight: 700;
+        white-space: nowrap;
+      }
+      .ref-remover {
+        font-size: 0.72rem;
+        color: var(--danger);
         font-weight: 700;
       }
       .item {
         display: flex;
         align-items: center;
         gap: 0.6rem;
-        padding: 0.45rem 0;
+        padding: 0.5rem 0;
         border-top: 1px solid var(--line);
+      }
+      .item.feito {
+        opacity: 0.55;
+      }
+      .check {
+        width: 1.5rem;
+        height: 1.5rem;
+        flex-shrink: 0;
+        border-radius: 999px;
+        border: 2px solid var(--line-strong);
+        color: #fff;
+        font-size: 0.8rem;
+        font-weight: 800;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+        transition: background 0.15s ease, border-color 0.15s ease;
+      }
+      .check.on {
+        background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dim) 100%);
+        border-color: transparent;
+        box-shadow: 0 0 10px -2px var(--accent-glow);
+      }
+      .item-x {
+        width: 1.5rem;
+        flex-shrink: 0;
+        color: var(--muted);
+        font-size: 0.8rem;
+      }
+      .item-x:active {
+        color: var(--danger);
       }
       .item-info {
         flex: 1;
@@ -329,33 +484,25 @@ type ModoAdd = 'lib' | 'novo';
         flex-direction: column;
       }
       .item-nome {
-        font-size: 0.95rem;
+        font-size: 0.92rem;
         font-weight: 600;
       }
       .item-sub {
-        font-size: 0.72rem;
+        font-size: 0.7rem;
       }
       .item-kcal {
         font-weight: 700;
-        font-size: 0.9rem;
-      }
-      .item-x {
-        color: var(--muted);
-        font-size: 0.85rem;
-        padding: 0.2rem 0.3rem;
-      }
-      .item-x:active {
-        color: var(--danger);
+        font-size: 0.88rem;
+        flex-shrink: 0;
       }
       .ref-vazio {
-        font-size: 0.82rem;
+        font-size: 0.8rem;
         padding: 0.4rem 0;
       }
       .add-item {
         margin-top: 0.5rem;
         width: 100%;
-        text-align: center;
-        font-size: 0.85rem;
+        font-size: 0.82rem;
         font-weight: 600;
         color: var(--accent-2);
         padding: 0.5rem;
@@ -368,6 +515,20 @@ type ModoAdd = 'lib' | 'novo';
       .nova-ref {
         width: 100%;
         margin: 0.2rem 0 1rem;
+      }
+      .vazio {
+        text-align: center;
+        padding: 1.5rem 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.8rem;
+        align-items: center;
+      }
+      .vazio-emoji {
+        font-size: 2.2rem;
+      }
+      .vazio p {
+        line-height: 1.5;
       }
       .carregando {
         text-align: center;
@@ -479,7 +640,7 @@ type ModoAdd = 'lib' | 'novo';
         gap: 0.2rem;
       }
       .qtd-label {
-        font-size: 0.68rem;
+        font-size: 0.66rem;
         text-transform: uppercase;
         letter-spacing: 0.08em;
         color: var(--muted);
@@ -506,7 +667,7 @@ type ModoAdd = 'lib' | 'novo';
         display: flex;
         flex-direction: column;
         gap: 0.2rem;
-        font-size: 0.68rem;
+        font-size: 0.66rem;
         text-transform: uppercase;
         letter-spacing: 0.06em;
         color: var(--muted);
@@ -522,17 +683,26 @@ type ModoAdd = 'lib' | 'novo';
 export class DietaComponent implements OnInit {
   private readonly svc = inject(DietaService);
 
-  protected readonly dataAtual = signal<string>('');
-  protected readonly dia = signal<DiaDieta | undefined>(undefined);
-  protected readonly metas = signal<MetasDieta | undefined>(undefined);
+  protected readonly CIRC = 2 * Math.PI * 52;
+
+  protected readonly plano = signal<DietaPlano | undefined>(undefined);
+  protected readonly metas = signal<MetasDieta>({
+    id: 'metas-dieta',
+    kcal: 2000,
+    proteina: 150,
+    carbo: 200,
+    gordura: 60,
+  });
   protected readonly alimentos = signal<Alimento[]>([]);
+  protected readonly dataAtual = signal<string>('');
+  protected readonly adesao = signal<DiaAdesao>({ id: '', data: '', comidos: [] });
+  protected readonly editando = signal(false);
 
   protected readonly overlay = signal<Overlay>('none');
   protected readonly modoAdd = signal<ModoAdd>('lib');
   protected readonly refeicaoAlvo = signal<string | null>(null);
   protected readonly alimentoSel = signal<Alimento | undefined>(undefined);
 
-  // campos de formulário (template-driven)
   protected busca = '';
   protected quantidade = 1;
   protected novo = {
@@ -545,40 +715,56 @@ export class DietaComponent implements OnInit {
   };
   protected metaForm = { kcal: 0, proteina: 0, carbo: 0, gordura: 0 };
 
-  protected readonly totais = computed(() => {
-    const d = this.dia();
+  private readonly comidosSet = computed(() => new Set(this.adesao().comidos));
+
+  protected readonly atual = computed<Macros>(() => {
+    const p = this.plano();
+    if (!p) return { kcal: 0, proteina: 0, carbo: 0, gordura: 0 };
+    return this.editando()
+      ? this.svc.macrosPlano(p)
+      : this.svc.macrosComidos(p, this.adesao());
+  });
+
+  protected readonly ringOffset = computed(() => {
+    const meta = this.metas().kcal;
+    const pct = meta > 0 ? Math.min(1, this.atual().kcal / meta) : 0;
+    return this.CIRC * (1 - pct);
+  });
+
+  protected readonly barras = computed(() => {
+    const a = this.atual();
     const m = this.metas();
-    const t = d ? this.svc.totaisDia(d) : { kcal: 0, proteina: 0, carbo: 0, gordura: 0 };
-    const metas = m ?? { kcal: 0, proteina: 0, carbo: 0, gordura: 0, id: '' };
     return [
-      { key: 'kcal', label: 'Calorias', un: '', atual: t.kcal, meta: metas.kcal },
-      { key: 'p', label: 'Proteína', un: 'g', atual: t.proteina, meta: metas.proteina },
-      { key: 'c', label: 'Carbo', un: 'g', atual: t.carbo, meta: metas.carbo },
-      { key: 'g', label: 'Gordura', un: 'g', atual: t.gordura, meta: metas.gordura },
+      { label: 'Proteína', un: 'g', atual: a.proteina, meta: m.proteina },
+      { label: 'Carbo', un: 'g', atual: a.carbo, meta: m.carbo },
+      { label: 'Gordura', un: 'g', atual: a.gordura, meta: m.gordura },
     ].map((x) => ({
       ...x,
       pct: x.meta > 0 ? Math.min(100, Math.round((x.atual / x.meta) * 100)) : 0,
     }));
   });
 
+  protected readonly semItens = computed(() => {
+    const p = this.plano();
+    return !!p && p.refeicoes.every((r) => r.itens.length === 0);
+  });
+
   async ngOnInit(): Promise<void> {
     this.metas.set(await this.svc.obterMetas());
     this.alimentos.set(await this.svc.listarAlimentos());
-    await this.carregarDia(this.svc.hoje());
+    this.plano.set(await this.svc.obterPlano());
+    this.dataAtual.set(this.svc.hoje());
+    this.adesao.set(await this.svc.obterAdesao(this.svc.hoje()));
   }
 
-  private async carregarDia(data: string): Promise<void> {
-    this.dataAtual.set(data);
-    this.dia.set(await this.svc.obterDia(data));
-  }
-
+  // ---- dia / adesão ----
   protected ehHoje(): boolean {
     return this.dataAtual() === this.svc.hoje();
   }
 
   protected labelData(): string {
     const d = this.dataAtual();
-    if (!d) return '';
+    if (!d) return 'Hoje';
     if (d === this.svc.hoje()) return 'Hoje';
     if (d === this.addDias(this.svc.hoje(), -1)) return 'Ontem';
     const [, m, dd] = d.split('-');
@@ -586,7 +772,9 @@ export class DietaComponent implements OnInit {
   }
 
   protected async mudarDia(delta: number): Promise<void> {
-    await this.carregarDia(this.addDias(this.dataAtual(), delta));
+    const nova = this.addDias(this.dataAtual(), delta);
+    this.dataAtual.set(nova);
+    this.adesao.set(await this.svc.obterAdesao(nova));
   }
 
   private addDias(data: string, delta: number): string {
@@ -596,14 +784,43 @@ export class DietaComponent implements OnInit {
     return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
   }
 
+  protected estaComido(itemId: string): boolean {
+    return this.comidosSet().has(itemId);
+  }
+
+  protected async toggleComido(itemId: string): Promise<void> {
+    const a = this.adesao();
+    const comidos = a.comidos.includes(itemId)
+      ? a.comidos.filter((x) => x !== itemId)
+      : [...a.comidos, itemId];
+    const novo: DiaAdesao = { ...a, id: this.dataAtual(), data: this.dataAtual(), comidos };
+    this.adesao.set(novo);
+    await this.svc.salvarAdesao(novo);
+  }
+
+  protected comidosNaRef(r: Refeicao): number {
+    const set = this.comidosSet();
+    return r.itens.filter((i) => set.has(i.id)).length;
+  }
+
   protected totalKcalRefeicao(refId: string): number {
-    const r = this.dia()?.refeicoes.find((x) => x.id === refId);
+    const r = this.plano()?.refeicoes.find((x) => x.id === refId);
     return r ? this.svc.totaisRefeicao(r).kcal : 0;
+  }
+
+  // ---- plano ----
+  private async patchPlano(fn: (p: DietaPlano) => void): Promise<void> {
+    const atual = this.plano();
+    if (!atual) return;
+    const copia: DietaPlano = JSON.parse(JSON.stringify(atual));
+    fn(copia);
+    this.plano.set(copia);
+    await this.svc.salvarPlano(copia);
   }
 
   protected nomeRefeicaoAlvo(): string {
     const id = this.refeicaoAlvo();
-    return this.dia()?.refeicoes.find((r) => r.id === id)?.nome ?? '';
+    return this.plano()?.refeicoes.find((r) => r.id === id)?.nome ?? '';
   }
 
   protected alimentosFiltrados(): Alimento[] {
@@ -616,7 +833,6 @@ export class DietaComponent implements OnInit {
     return Math.round(a.kcal * (this.quantidade > 0 ? this.quantidade : 1));
   }
 
-  // ---- overlays ----
   protected abrirAdd(refId: string): void {
     this.refeicaoAlvo.set(refId);
     this.modoAdd.set('lib');
@@ -629,7 +845,7 @@ export class DietaComponent implements OnInit {
 
   protected abrirMetas(): void {
     const m = this.metas();
-    if (m) this.metaForm = { kcal: m.kcal, proteina: m.proteina, carbo: m.carbo, gordura: m.gordura };
+    this.metaForm = { kcal: m.kcal, proteina: m.proteina, carbo: m.carbo, gordura: m.gordura };
     this.overlay.set('metas');
   }
 
@@ -637,23 +853,13 @@ export class DietaComponent implements OnInit {
     this.overlay.set('none');
   }
 
-  // ---- mutações no dia ----
-  private async patchDia(fn: (d: DiaDieta) => void): Promise<void> {
-    const atual = this.dia();
-    if (!atual) return;
-    const copia: DiaDieta = JSON.parse(JSON.stringify(atual));
-    fn(copia);
-    this.dia.set(copia);
-    await this.svc.salvarDia(copia);
-  }
-
   protected async confirmarLib(): Promise<void> {
     const a = this.alimentoSel();
     const refId = this.refeicaoAlvo();
     if (!a || !refId) return;
     const item = this.svc.criarItem(a, this.quantidade);
-    await this.patchDia((d) => {
-      d.refeicoes.find((r) => r.id === refId)?.itens.push(item);
+    await this.patchPlano((p) => {
+      p.refeicoes.find((r) => r.id === refId)?.itens.push(item);
     });
     this.fechar();
   }
@@ -673,15 +879,15 @@ export class DietaComponent implements OnInit {
     await this.svc.salvarAlimento(alimento);
     this.alimentos.set([...this.alimentos(), alimento].sort((x, y) => x.nome.localeCompare(y.nome)));
     const item = this.svc.criarItem(alimento, this.quantidade);
-    await this.patchDia((d) => {
-      d.refeicoes.find((r) => r.id === refId)?.itens.push(item);
+    await this.patchPlano((p) => {
+      p.refeicoes.find((r) => r.id === refId)?.itens.push(item);
     });
     this.fechar();
   }
 
   protected async removerItem(refId: string, itemId: string): Promise<void> {
-    await this.patchDia((d) => {
-      const r = d.refeicoes.find((x) => x.id === refId);
+    await this.patchPlano((p) => {
+      const r = p.refeicoes.find((x) => x.id === refId);
       if (r) r.itens = r.itens.filter((i) => i.id !== itemId);
     });
   }
@@ -689,8 +895,14 @@ export class DietaComponent implements OnInit {
   protected async adicionarRefeicao(): Promise<void> {
     const nome = prompt('Nome da refeição:');
     if (!nome || !nome.trim()) return;
-    await this.patchDia((d) => {
-      d.refeicoes.push({ id: crypto.randomUUID(), nome: nome.trim(), itens: [] });
+    await this.patchPlano((p) => {
+      p.refeicoes.push({ id: crypto.randomUUID(), nome: nome.trim(), itens: [] });
+    });
+  }
+
+  protected async removerRefeicao(refId: string): Promise<void> {
+    await this.patchPlano((p) => {
+      p.refeicoes = p.refeicoes.filter((r) => r.id !== refId);
     });
   }
 

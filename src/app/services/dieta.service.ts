@@ -2,7 +2,8 @@ import { inject, Injectable } from '@angular/core';
 import { DbService } from '@services/db.service';
 import {
   Alimento,
-  DiaDieta,
+  DiaAdesao,
+  DietaPlano,
   ItemRefeicao,
   Macros,
   MetasDieta,
@@ -14,6 +15,7 @@ function uid(): string {
 }
 
 const REFEICOES_PADRAO = ['Café da manhã', 'Almoço', 'Lanche', 'Jantar'];
+const PLANO_ID = 'plano';
 const METAS_ID = 'metas-dieta';
 const METAS_PADRAO: MetasDieta = {
   id: METAS_ID,
@@ -61,24 +63,32 @@ export class DietaService {
     await this.db.put('config', { ...metas, id: METAS_ID });
   }
 
-  // ---- Dia de dieta ----
-  /** Busca o dia; se não existir, retorna um novo (não persistido) com refeições padrão. */
-  async obterDia(data: string): Promise<DiaDieta> {
-    const existente = await this.db.get<DiaDieta>('dieta', data);
-    if (existente) return existente;
+  // ---- Plano fixo ----
+  /** Plano de dieta (único). Se não existir, retorna um novo com refeições padrão vazias. */
+  async obterPlano(): Promise<DietaPlano> {
+    const p = await this.db.get<DietaPlano>('dieta', PLANO_ID);
+    if (p) return p;
     return {
-      id: data,
-      data,
+      id: PLANO_ID,
       refeicoes: REFEICOES_PADRAO.map((nome) => ({ id: uid(), nome, itens: [] })),
     };
   }
 
-  async salvarDia(dia: DiaDieta): Promise<void> {
-    await this.db.put('dieta', dia);
+  async salvarPlano(plano: DietaPlano): Promise<void> {
+    await this.db.put('dieta', { ...plano, id: PLANO_ID });
+  }
+
+  // ---- Adesão do dia ----
+  async obterAdesao(data: string): Promise<DiaAdesao> {
+    const a = await this.db.get<DiaAdesao>('adesao', data);
+    return a ?? { id: data, data, comidos: [] };
+  }
+
+  async salvarAdesao(adesao: DiaAdesao): Promise<void> {
+    await this.db.put('adesao', adesao);
   }
 
   // ---- Helpers de macros ----
-  /** Cria um item de refeição a partir de um alimento e quantidade (multiplicador). */
   criarItem(alimento: Alimento, quantidade: number): ItemRefeicao {
     const q = quantidade > 0 ? quantidade : 1;
     return {
@@ -98,8 +108,16 @@ export class DietaService {
     return this.somar(ref.itens);
   }
 
-  totaisDia(dia: DiaDieta): Macros {
-    return this.somar(dia.refeicoes.flatMap((r) => r.itens));
+  /** Macros totais do plano inteiro (a dieta completa). */
+  macrosPlano(plano: DietaPlano): Macros {
+    return this.somar(plano.refeicoes.flatMap((r) => r.itens));
+  }
+
+  /** Macros do que foi comido num dia (itens do plano marcados na adesão). */
+  macrosComidos(plano: DietaPlano, adesao: DiaAdesao): Macros {
+    const comidos = new Set(adesao.comidos);
+    const itens = plano.refeicoes.flatMap((r) => r.itens).filter((i) => comidos.has(i.id));
+    return this.somar(itens);
   }
 
   private somar(itens: ItemRefeicao[]): Macros {
