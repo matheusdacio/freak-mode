@@ -19,6 +19,12 @@ export class SessaoService {
       .sort((a, b) => a.ordem - b.ordem);
   }
 
+  /** Todas as sessões concluídas (todos os treinos). */
+  async concluidas(): Promise<Sessao[]> {
+    const todas = await this.db.getAll<Sessao>('sessoes');
+    return todas.filter((s) => s.status !== 'rascunho');
+  }
+
   private async ultima(treinoId: string): Promise<Sessao | undefined> {
     const lista = await this.porTreino(treinoId);
     return lista.at(-1);

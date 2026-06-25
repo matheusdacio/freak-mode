@@ -6,7 +6,7 @@ import {
   signal,
 } from '@angular/core';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { TreinoService } from '@services/treino.service';
 import { Treino } from '@models/treino.model';
 import { AuthService } from '@services/auth.service';
@@ -21,7 +21,7 @@ import {
 
 @Component({
   selector: 'app-treinos',
-  imports: [ReactiveFormsModule, CdkDropList, CdkDrag, CdkDragHandle],
+  imports: [ReactiveFormsModule, RouterLink, CdkDropList, CdkDrag, CdkDragHandle],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header class="topo anim-in">
@@ -30,7 +30,10 @@ import {
           <p class="kicker">SEM DESCULPAS</p>
           <h1>TREINOS</h1>
         </div>
-        <button class="btn-sair" (click)="sair()" title="Sair da conta">SAIR</button>
+        <div class="topo-acoes">
+          <a class="btn-cal" routerLink="/calendario" title="Calendário de treinos">📅</a>
+          <button class="btn-sair" (click)="sair()" title="Sair da conta">SAIR</button>
+        </div>
       </div>
     </header>
 
@@ -160,6 +163,24 @@ import {
         background-clip: text;
         -webkit-text-fill-color: transparent;
       }
+      .topo-acoes {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        margin-top: 0.4rem;
+      }
+      .btn-cal {
+        font-size: 1rem;
+        line-height: 1;
+        padding: 0.4rem 0.6rem;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        text-decoration: none;
+        background: var(--surface);
+      }
+      .btn-cal:active {
+        border-color: var(--accent-dim);
+      }
       .btn-sair {
         font-size: 0.7rem;
         color: var(--muted);
@@ -168,7 +189,6 @@ import {
         padding: 0.45rem 0.8rem;
         border: 1px solid var(--line);
         border-radius: 999px;
-        margin-top: 0.4rem;
       }
       .btn-sair:active {
         color: var(--text);

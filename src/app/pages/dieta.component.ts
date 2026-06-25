@@ -98,10 +98,11 @@ type Overlay = 'none' | 'opcao' | 'metas';
         @for (r of p.refeicoes; track r.id) {
           <section class="ref anim-in">
             <div class="ref-head">
-              <div class="ref-titulo">
+              <button class="ref-titulo" (click)="toggleMin(r.id)">
+                <span class="chev">{{ minimizada(r.id) ? '▸' : '▾' }}</span>
                 <h2>{{ r.nome }}</h2>
                 @if (r.horario) { <span class="ref-hora">{{ r.horario }}</span> }
-              </div>
+              </button>
               @if (editando()) {
                 <button class="ref-remover" (click)="removerRefeicao(r.id)">remover</button>
               } @else {
@@ -109,6 +110,7 @@ type Overlay = 'none' | 'opcao' | 'metas';
               }
             </div>
 
+            @if (!minimizada(r.id)) {
             @for (c of r.componentes; track c.id) {
               <div class="comp">
                 <div class="comp-head">
@@ -162,6 +164,7 @@ type Overlay = 'none' | 'opcao' | 'metas';
 
             @if (editando()) {
               <button class="add-comp" (click)="adicionarComponente(r.id)">＋ componente</button>
+            }
             }
           </section>
         }
@@ -249,7 +252,8 @@ type Overlay = 'none' | 'opcao' | 'metas';
 
       .ref { background: linear-gradient(160deg, var(--surface) 0%, var(--surface-2) 140%); border: 1px solid var(--line); border-radius: var(--radius); padding: 0.85rem 0.95rem; margin-bottom: 0.7rem; }
       .ref-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.5rem; }
-      .ref-titulo { display: flex; align-items: baseline; gap: 0.5rem; }
+      .ref-titulo { display: flex; align-items: baseline; gap: 0.5rem; background: transparent; padding: 0; text-align: left; }
+      .chev { color: var(--muted); font-size: 0.8rem; align-self: center; }
       h2 { font-family: var(--font-display); font-size: 1.15rem; text-transform: uppercase; }
       .ref-hora { font-size: 0.72rem; color: var(--muted); font-weight: 700; }
       .ref-kcal { font-size: 0.74rem; color: var(--accent-2); font-weight: 700; white-space: nowrap; }
@@ -305,6 +309,7 @@ export class DietaComponent implements OnInit {
   protected readonly adesao = signal<DiaAdesao>({ id: '', data: '', escolhas: {} });
   protected readonly editando = signal(false);
   protected readonly expandidos = signal<Set<string>>(new Set());
+  protected readonly minimizadas = signal<Set<string>>(new Set());
 
   protected readonly overlay = signal<Overlay>('none');
   private editCtx: { refId: string; compId: string } = { refId: '', compId: '' };
@@ -404,6 +409,15 @@ export class DietaComponent implements OnInit {
   }
   protected refKcal(r: RefeicaoPlano): number {
     return this.svc.macrosRefeicao(r, this.adesao()).kcal;
+  }
+  protected minimizada(refId: string): boolean {
+    return this.minimizadas().has(refId);
+  }
+  protected toggleMin(refId: string): void {
+    const s = new Set(this.minimizadas());
+    if (s.has(refId)) s.delete(refId);
+    else s.add(refId);
+    this.minimizadas.set(s);
   }
 
   // ---- editar plano ----
