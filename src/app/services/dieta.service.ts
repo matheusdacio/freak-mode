@@ -1,20 +1,20 @@
 import { inject, Injectable } from '@angular/core';
 import { DbService } from '@services/db.service';
 import {
-  Alimento,
+  Componente,
   DiaAdesao,
   DietaPlano,
-  ItemRefeicao,
   Macros,
   MetasDieta,
-  Refeicao,
+  OpcaoAlimento,
+  RefeicaoPlano,
 } from '@models/dieta.model';
+import { planoMatheus } from '../data/dieta-seed';
 
 function uid(): string {
   return crypto.randomUUID();
 }
 
-const REFEICOES_PADRAO = ['Café da manhã', 'Almoço', 'Lanche', 'Jantar'];
 const PLANO_ID = 'plano';
 const METAS_ID = 'metas-dieta';
 const METAS_PADRAO: MetasDieta = {
@@ -29,28 +29,9 @@ const METAS_PADRAO: MetasDieta = {
 export class DietaService {
   private readonly db = inject(DbService);
 
-  /** Data de hoje no formato YYYY-MM-DD (local). */
   hoje(): string {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  }
-
-  // ---- Biblioteca de alimentos ----
-  async listarAlimentos(): Promise<Alimento[]> {
-    const todos = await this.db.getAll<Alimento>('alimentos');
-    return todos.sort((a, b) => a.nome.localeCompare(b.nome));
-  }
-
-  novoAlimento(dados: Omit<Alimento, 'id'>): Alimento {
-    return { id: uid(), ...dados };
-  }
-
-  async salvarAlimento(alimento: Alimento): Promise<void> {
-    await this.db.put('alimentos', alimento);
-  }
-
-  async removerAlimento(id: string): Promise<void> {
-    await this.db.delete('alimentos', id);
   }
 
   // ---- Metas ----
@@ -63,70 +44,84 @@ export class DietaService {
     await this.db.put('config', { ...metas, id: METAS_ID });
   }
 
-  // ---- Plano fixo ----
-  /** Plano de dieta (único). Se não existir, retorna um novo com refeições padrão vazias. */
+  // ---- Plano ----
   async obterPlano(): Promise<DietaPlano> {
     const p = await this.db.get<DietaPlano>('dieta', PLANO_ID);
-    if (p) return p;
-    return {
-      id: PLANO_ID,
-      refeicoes: REFEICOES_PADRAO.map((nome) => ({ id: uid(), nome, itens: [] })),
-    };
+    // Compatibilidade: formatos antigos não tinham "componentes" — trata como vazio.
+    const valido =
+      p && Array.isArray(p.refeicoes) && p.refeicoes.every((r) => Array.isArray(r.componentes));
+    return valido ? (p as DietaPlano) : { id: PLANO_ID, refeicoes: [] };
   }
 
   async salvarPlano(plano: DietaPlano): Promise<void> {
     await this.db.put('dieta', { ...plano, id: PLANO_ID });
   }
 
+  /** Carrega o plano pré-montado do Matheus (Dietbox) e salva. */
+  async importarPlanoMatheus(): Promise<DietaPlano> {
+    const plano = planoMatheus();
+    await this.salvarPlano(plano);
+    return plano;
+  }
+
   // ---- Adesão do dia ----
   async obterAdesao(data: string): Promise<DiaAdesao> {
     const a = await this.db.get<DiaAdesao>('adesao', data);
-    return a ?? { id: data, data, comidos: [] };
+    // Compatibilidade: garante o objeto "escolhas".
+    if (a && a.escolhas && typeof a.escolhas === 'object') return a;
+    return { id: data, data, escolhas: {} };
   }
 
   async salvarAdesao(adesao: DiaAdesao): Promise<void> {
     await this.db.put('adesao', adesao);
   }
 
-  // ---- Helpers de macros ----
-  criarItem(alimento: Alimento, quantidade: number): ItemRefeicao {
-    const q = quantidade > 0 ? quantidade : 1;
-    return {
-      id: uid(),
-      alimentoId: alimento.id,
-      nome: alimento.nome,
-      porcao: alimento.porcao,
-      quantidade: q,
-      kcal: Math.round(alimento.kcal * q),
-      proteina: this.arred(alimento.proteina * q),
-      carbo: this.arred(alimento.carbo * q),
-      gordura: this.arred(alimento.gordura * q),
-    };
+  // ---- Fábricas (itens novos no editor) ----
+  novaOpcao(dados: Omit<OpcaoAlimento, 'id'>): OpcaoAlimento {
+    return { id: uid(), ...dados };
+  }
+  novoComponente(nome: string): Componente {
+    return { id: uid(), nome, opcoes: [] };
+  }
+  novaRefeicao(nome: string, horario?: string): RefeicaoPlano {
+    return { id: uid(), nome, horario, componentes: [] };
   }
 
-  totaisRefeicao(ref: Refeicao): Macros {
-    return this.somar(ref.itens);
+  // ---- Macros ----
+  private mapaOpcoes(plano: DietaPlano): Map<string, OpcaoAlimento> {
+    const m = new Map<string, OpcaoAlimento>();
+    for (const r of plano.refeicoes)
+      for (const c of r.componentes) for (const o of c.opcoes) m.set(o.id, o);
+    return m;
   }
 
-  /** Macros totais do plano inteiro (a dieta completa). */
-  macrosPlano(plano: DietaPlano): Macros {
-    return this.somar(plano.refeicoes.flatMap((r) => r.itens));
+  /** Macros do que foi escolhido no dia (uma opção por componente). */
+  macrosEscolhidos(plano: DietaPlano, adesao: DiaAdesao): Macros {
+    const mapa = this.mapaOpcoes(plano);
+    const opcoes = Object.values(adesao.escolhas)
+      .map((id) => mapa.get(id))
+      .filter((o): o is OpcaoAlimento => !!o);
+    return this.somar(opcoes);
   }
 
-  /** Macros do que foi comido num dia (itens do plano marcados na adesão). */
-  macrosComidos(plano: DietaPlano, adesao: DiaAdesao): Macros {
-    const comidos = new Set(adesao.comidos);
-    const itens = plano.refeicoes.flatMap((r) => r.itens).filter((i) => comidos.has(i.id));
-    return this.somar(itens);
+  /** Macros escolhidos dentro de uma refeição específica. */
+  macrosRefeicao(ref: RefeicaoPlano, adesao: DiaAdesao): Macros {
+    const escolhidas = ref.componentes
+      .map((c) => adesao.escolhas[c.id])
+      .filter(Boolean);
+    const opcoes = ref.componentes
+      .flatMap((c) => c.opcoes)
+      .filter((o) => escolhidas.includes(o.id));
+    return this.somar(opcoes);
   }
 
-  private somar(itens: ItemRefeicao[]): Macros {
-    return itens.reduce<Macros>(
-      (acc, i) => ({
-        kcal: acc.kcal + (i.kcal || 0),
-        proteina: this.arred(acc.proteina + (i.proteina || 0)),
-        carbo: this.arred(acc.carbo + (i.carbo || 0)),
-        gordura: this.arred(acc.gordura + (i.gordura || 0)),
+  private somar(opcoes: OpcaoAlimento[]): Macros {
+    return opcoes.reduce<Macros>(
+      (acc, o) => ({
+        kcal: acc.kcal + (o.kcal || 0),
+        proteina: this.arred(acc.proteina + (o.proteina || 0)),
+        carbo: this.arred(acc.carbo + (o.carbo || 0)),
+        gordura: this.arred(acc.gordura + (o.gordura || 0)),
       }),
       { kcal: 0, proteina: 0, carbo: 0, gordura: 0 },
     );

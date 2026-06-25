@@ -1,8 +1,8 @@
-/** Alimento cadastrado na biblioteca (macros por porção). Reutilizável nas refeições. */
-export interface Alimento {
+/** Uma opção de alimento dentro de um componente (substituível por outra). */
+export interface OpcaoAlimento {
   readonly id: string;
   nome: string;
-  /** Descrição da porção de referência, ex: "100g", "1 fatia", "1 unidade". */
+  /** Porção de referência, ex: "2 fatias (50g)". */
   porcao: string;
   kcal: number;
   proteina: number; // g
@@ -10,40 +10,33 @@ export interface Alimento {
   gordura: number;  // g
 }
 
-/** Um alimento dentro de uma refeição do plano (snapshot dos macros já multiplicados). */
-export interface ItemRefeicao {
+/** Um componente da refeição (ex: Carboidrato, Proteína) com suas opções de substituição. */
+export interface Componente {
   readonly id: string;
-  alimentoId?: string;
   nome: string;
-  porcao: string;
-  /** Multiplicador da porção (ex: 1.5 = uma porção e meia). */
-  quantidade: number;
-  /** Totais já multiplicados pela quantidade. */
-  kcal: number;
-  proteina: number;
-  carbo: number;
-  gordura: number;
+  opcoes: OpcaoAlimento[];
 }
 
 /** Uma refeição do plano (Café da manhã, Almoço...). */
-export interface Refeicao {
+export interface RefeicaoPlano {
   readonly id: string;
   nome: string;
-  itens: ItemRefeicao[];
+  horario?: string;
+  componentes: Componente[];
 }
 
-/** Plano de dieta FIXO — vale para todos os dias. Documento único (id 'plano'). */
+/** Plano de dieta FIXO — vale todo dia. Documento único (id 'plano'). */
 export interface DietaPlano {
   readonly id: string;
-  refeicoes: Refeicao[];
+  refeicoes: RefeicaoPlano[];
 }
 
-/** Adesão de um dia: quais itens do plano foram realmente comidos. id = YYYY-MM-DD. */
+/** Adesão de um dia: qual opção foi escolhida em cada componente. id = YYYY-MM-DD. */
 export interface DiaAdesao {
   readonly id: string;
   data: string;
-  /** ids dos itens do plano marcados como comidos nesse dia. */
-  comidos: string[];
+  /** componenteId -> opcaoId escolhida nesse dia. */
+  escolhas: Record<string, string>;
 }
 
 /** Metas diárias de macros. Documento único (id 'metas-dieta'). */
@@ -55,7 +48,7 @@ export interface MetasDieta {
   gordura: number;
 }
 
-/** Soma de macros (totais do plano / consumido / por refeição). */
+/** Soma de macros. */
 export interface Macros {
   kcal: number;
   proteina: number;
