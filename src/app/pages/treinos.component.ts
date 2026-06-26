@@ -8,6 +8,7 @@ import {
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { TreinoService } from '@services/treino.service';
+import { Exercicio } from '@models/exercicio.model';
 import { Treino } from '@models/treino.model';
 import { AuthService } from '@services/auth.service';
 import { Conquista, ConquistasService } from '@services/conquistas.service';
@@ -132,6 +133,10 @@ import {
             }
           </div>
         </section>
+      }
+
+      @if (svc.treinos().length > 0) {
+        <button class="exportar" (click)="exportar()" title="Exportar treinos (.xlsx)">⬇ exportar</button>
       }
     } @else {
       <p class="muted carregando">Carregando…</p>
@@ -261,6 +266,20 @@ import {
       .carregando {
         text-align: center;
         padding: 2rem;
+      }
+      .exportar {
+        display: block;
+        margin: 1.5rem auto 0.5rem;
+        font-size: 0.68rem;
+        letter-spacing: 0.1em;
+        color: var(--muted);
+        opacity: 0.5;
+        padding: 0.3rem 0.5rem;
+        background: transparent;
+      }
+      .exportar:active {
+        opacity: 1;
+        color: var(--accent-2);
       }
 
       .lista {
@@ -532,5 +551,38 @@ export class TreinosComponent implements OnInit {
   protected async sair(): Promise<void> {
     await this.auth.sair();
     this.router.navigate(['/login']);
+  }
+
+  protected async exportar(): Promise<void> {
+    const XLSX = await import('xlsx');
+    const linhas: Record<string, string | number>[] = [];
+    for (const t of this.svc.treinos()) {
+      if (t.exercicios.length === 0) {
+        linhas.push({ Treino: t.nome, Exercício: '', Séries: '', Reps: '' });
+        continue;
+      }
+      for (const ex of t.exercicios) {
+        linhas.push({
+          Treino: t.nome,
+          Exercício: ex.nome,
+          Séries: ex.series,
+          Reps: this.faixaTexto(ex),
+        });
+      }
+    }
+    const ws = XLSX.utils.json_to_sheet(linhas);
+    ws['!cols'] = [{ wch: 18 }, { wch: 28 }, { wch: 8 }, { wch: 10 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Treinos');
+    XLSX.writeFile(wb, 'freakmode-treinos.xlsx');
+  }
+
+  private faixaTexto(ex: Exercicio): string {
+    const min = ex.repsMin ?? ex.reps;
+    const max = ex.repsMax ?? ex.reps;
+    if (min && max) return min === max ? `${min}` : `${min}-${max}`;
+    if (min) return `${min}+`;
+    if (max) return `até ${max}`;
+    return '';
   }
 }
