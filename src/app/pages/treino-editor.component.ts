@@ -72,12 +72,25 @@ import { TreinoService } from '@services/treino.service';
                       <button class="step" (click)="ajustarSeries(i, 1)">+</button>
                     </div>
                     <span class="sep">×</span>
-                    <div class="contador">
-                      <button class="step" (click)="ajustarReps(i, -1)">−</button>
-                      <span class="qtd">
-                        {{ ex.reps ? ex.reps : '—' }}<small>reps</small>
-                      </span>
-                      <button class="step" (click)="ajustarReps(i, 1)">+</button>
+                    <div class="faixa-reps">
+                      <input
+                        class="rep-in"
+                        type="number"
+                        inputmode="numeric"
+                        placeholder="–"
+                        [value]="ex.repsMin ?? ex.reps ?? ''"
+                        (input)="setReps(i, 'min', $event)"
+                      />
+                      <span class="traco">a</span>
+                      <input
+                        class="rep-in"
+                        type="number"
+                        inputmode="numeric"
+                        placeholder="–"
+                        [value]="ex.repsMax ?? ex.reps ?? ''"
+                        (input)="setReps(i, 'max', $event)"
+                      />
+                      <small>reps</small>
                     </div>
                   </div>
                 </div>
@@ -301,6 +314,43 @@ import { TreinoService } from '@services/treino.service';
         display: flex;
         align-items: center;
         gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+      .faixa-reps {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+        background: var(--bg);
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 0.2rem 0.6rem;
+      }
+      .rep-in {
+        width: 2.4rem;
+        background: transparent;
+        border: none;
+        outline: none;
+        text-align: center;
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: var(--text);
+        padding: 0.25rem 0;
+      }
+      .rep-in::placeholder {
+        color: var(--muted);
+      }
+      .traco {
+        font-size: 0.8rem;
+        color: var(--muted);
+        font-weight: 700;
+      }
+      .faixa-reps small {
+        font-size: 0.56rem;
+        color: var(--muted);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        margin-left: 0.1rem;
       }
       .contador {
         display: flex;
@@ -423,14 +473,21 @@ export class TreinoEditorComponent implements OnInit {
     });
   }
 
-  protected ajustarReps(index: number, delta: number): void {
+  protected setReps(index: number, campo: 'min' | 'max', event: Event): void {
+    const raw = (event.target as HTMLInputElement).value;
+    const n = raw.trim() === '' ? undefined : Math.max(0, Math.floor(Number(raw)));
+    const valor = n && n > 0 ? n : undefined;
     this.patch((t) => {
       const ex = t.exercicios[index];
-      if (ex) {
-        const atual = ex.reps ?? 0;
-        const novo = Math.max(0, atual + delta);
-        ex.reps = novo > 0 ? novo : undefined;
+      if (!ex) return;
+      // migra o formato antigo (reps único) preservando o valor no campo ainda vazio
+      if (ex.reps !== undefined) {
+        if (ex.repsMin === undefined) ex.repsMin = ex.reps;
+        if (ex.repsMax === undefined) ex.repsMax = ex.reps;
+        ex.reps = undefined;
       }
+      if (campo === 'min') ex.repsMin = valor;
+      else ex.repsMax = valor;
     });
   }
 

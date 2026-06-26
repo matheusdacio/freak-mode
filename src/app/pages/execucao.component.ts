@@ -64,6 +64,9 @@ import { TreinoService } from '@services/treino.service';
             <div class="ex-cabecalho">
               <span class="ex-num">{{ ei + 1 }}</span>
               <h2>{{ item.nomeExercicio }}</h2>
+              @if (faixaReps(item.exercicioId); as faixa) {
+                <span class="ex-alvo">{{ faixa }}</span>
+              }
             </div>
             @if (!minimalista()) {
               <div class="grade-cabecalho">
@@ -246,6 +249,18 @@ import { TreinoService } from '@services/treino.service';
       .ex--min .ex-cabecalho {
         margin-bottom: 0.5rem;
       }
+      .ex-alvo {
+        margin-left: auto;
+        font-size: 0.7rem;
+        font-weight: 700;
+        color: var(--accent-2);
+        background: var(--accent-soft);
+        border: 1px solid var(--accent-dim);
+        border-radius: 999px;
+        padding: 0.2rem 0.55rem;
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
       .ex-num {
         display: flex;
         align-items: center;
@@ -410,6 +425,17 @@ export class ExecucaoComponent implements OnInit, OnDestroy {
   protected ordemLabel(): string {
     const ordem = this.sessao()?.ordem ?? 1;
     return `SESSÃO Nº ${ordem}`;
+  }
+
+  protected faixaReps(exercicioId: string): string {
+    const ex = this.treino()?.exercicios.find((e) => e.id === exercicioId);
+    if (!ex) return '';
+    const min = ex.repsMin ?? ex.reps;
+    const max = ex.repsMax ?? ex.reps;
+    if (min && max) return min === max ? `${min} reps` : `${min}–${max} reps`;
+    if (min) return `${min}+ reps`;
+    if (max) return `até ${max} reps`;
+    return '';
   }
 
   protected async descartar(): Promise<void> {

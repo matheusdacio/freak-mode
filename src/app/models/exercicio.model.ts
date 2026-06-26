@@ -3,6 +3,10 @@ export interface Exercicio {
   nome: string;
   /** Quantidade de séries a executar */
   series: number;
-  /** Repetições padrão por série (pré-preenchido na execução) */
+  /** (legado) Repetições padrão por série. Mantido por compatibilidade. */
   reps?: number;
+  /** Faixa de repetições alvo — mínimo (ex: 8 em "8–12"). */
+  repsMin?: number;
+  /** Faixa de repetições alvo — máximo (ex: 12 em "8–12"). */
+  repsMax?: number;
 }

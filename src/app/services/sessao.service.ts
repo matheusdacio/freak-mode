@@ -54,7 +54,7 @@ export class SessaoService {
         const ref = itemAnterior?.series[idx];
         return {
           peso: null,
-          reps: ref?.reps ?? (ex.reps && ex.reps > 0 ? ex.reps : null),
+          reps: ref?.reps ?? ex.repsMin ?? ex.reps ?? null,
           pesoAnterior: ref?.peso ?? null,
         };
       });
