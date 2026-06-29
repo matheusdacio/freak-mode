@@ -7,6 +7,10 @@ function uid(): string {
   return crypto.randomUUID();
 }
 
+function dataLocal(d = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 @Injectable({ providedIn: 'root' })
 export class SessaoService {
   private readonly db = inject(DbService);
@@ -66,9 +70,37 @@ export class SessaoService {
       treinoId: treino.id,
       ordem: proximaOrdem,
       itens,
-      data: new Date().toISOString().slice(0, 10),
+      data: dataLocal(),
       status: 'rascunho',
     };
+  }
+
+  async criarRetroativo(treino: Treino, data: string): Promise<void> {
+    const anterior = await this.ultima(treino.id);
+    const proximaOrdem = anterior ? anterior.ordem + 1 : 1;
+
+    const itens: ItemSessao[] = treino.exercicios.map((ex) => {
+      const itemAnterior = anterior?.itens.find((i) => i.exercicioId === ex.id);
+      const series: RegistroSerie[] = Array.from({ length: ex.series }, (_, idx) => {
+        const ref = itemAnterior?.series[idx];
+        return {
+          peso: ref?.peso ?? null,
+          reps: ref?.reps ?? ex.repsMin ?? ex.reps ?? null,
+          pesoAnterior: ref?.peso ?? null,
+        };
+      });
+      return { exercicioId: ex.id, nomeExercicio: ex.nome, series, notas: '' };
+    });
+
+    const sessao: Sessao = {
+      id: uid(),
+      treinoId: treino.id,
+      ordem: proximaOrdem,
+      itens,
+      data,
+      status: 'concluida',
+    };
+    await this.db.put('sessoes', sessao);
   }
 
   async salvar(sessao: Sessao): Promise<void> {

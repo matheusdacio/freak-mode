@@ -9,12 +9,20 @@ import {
 import { RouterLink } from '@angular/router';
 import { SessaoService } from '@services/sessao.service';
 import { TreinoService } from '@services/treino.service';
+import { Treino } from '@models/treino.model';
 
 interface Celula {
   dia: number | null;
   dateStr: string;
   treinos: string[];
   hoje: boolean;
+}
+
+interface DetalheSel {
+  label: string;
+  dateStr: string;
+  treinos: string[];
+  passado: boolean;
 }
 
 const MESES = [
@@ -79,6 +87,19 @@ const MESES = [
         } @else {
           <p class="muted">Nenhum treino registrado neste dia.</p>
         }
+
+        @if (d.passado && d.treinos.length === 0) {
+          <div class="retro-bloco">
+            <p class="retro-label">Você treinou neste dia?</p>
+            <div class="retro-lista">
+              @for (t of treinos(); track t.id) {
+                <button class="btn-retro" [disabled]="salvando()" (click)="registrarRetroativo(t, d.dateStr)">
+                  🏋️ {{ t.nome }}
+                </button>
+              }
+            </div>
+          </div>
+        }
       </section>
     }
   `,
@@ -111,6 +132,11 @@ const MESES = [
       .detalhe h2 { font-family: var(--font-display); font-size: 1.2rem; text-transform: uppercase; margin-bottom: 0.5rem; }
       .treino-dia { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0; font-weight: 600; }
       .tag { font-size: 1rem; }
+      .retro-bloco { margin-top: 0.8rem; padding-top: 0.8rem; border-top: 1px solid var(--line); }
+      .retro-label { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 0.5rem; }
+      .retro-lista { display: flex; flex-direction: column; gap: 0.4rem; }
+      .btn-retro { display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem 0.9rem; border-radius: var(--radius-sm); background: var(--accent-soft); border: 1px solid var(--accent-dim); color: var(--accent-2); font-size: 0.9rem; font-weight: 600; text-align: left; }
+      .btn-retro:disabled { opacity: 0.5; }
     `,
   ],
 })
@@ -155,11 +181,20 @@ export class CalendarioComponent implements OnInit {
     return total;
   });
 
-  protected readonly detalheSel = computed(() => {
+  protected readonly treinos = computed(() => this.treinoSvc.treinos());
+  protected readonly salvando = signal(false);
+
+  protected readonly detalheSel = computed<DetalheSel | null>(() => {
     const sel = this.selecionado();
     if (!sel) return null;
     const [y, m, d] = sel.split('-');
-    return { label: `${d}/${m}/${y}`, treinos: this.porData().get(sel) ?? [] };
+    const hojeStr = this.dataStr(this.hoje.getFullYear(), this.hoje.getMonth(), this.hoje.getDate());
+    return {
+      label: `${d}/${m}/${y}`,
+      dateStr: sel,
+      treinos: this.porData().get(sel) ?? [],
+      passado: sel < hojeStr,
+    };
   });
 
   async ngOnInit(): Promise<void> {
@@ -175,6 +210,18 @@ export class CalendarioComponent implements OnInit {
       mapa.set(s.data, lista);
     }
     this.porData.set(mapa);
+  }
+
+  async registrarRetroativo(treino: Treino, data: string): Promise<void> {
+    this.salvando.set(true);
+    await this.sessaoSvc.criarRetroativo(treino, data);
+    const mapa = new Map(this.porData());
+    const nomePorId = new Map(this.treinoSvc.treinos().map((t) => [t.id, t.nome]));
+    const lista = mapa.get(data) ?? [];
+    lista.push(nomePorId.get(treino.id) ?? treino.nome);
+    mapa.set(data, lista);
+    this.porData.set(mapa);
+    this.salvando.set(false);
   }
 
   protected mudarMes(delta: number): void {

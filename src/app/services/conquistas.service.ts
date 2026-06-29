@@ -41,7 +41,10 @@ function calcularStreak(sessoes: Sessao[]): number {
   const cursor = new Date();
   cursor.setHours(0, 0, 0, 0);
 
-  while (datas.has(cursor.toISOString().slice(0, 10))) {
+  const localStr = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+  while (datas.has(localStr(cursor))) {
     streak++;
     cursor.setDate(cursor.getDate() - 1);
   }
