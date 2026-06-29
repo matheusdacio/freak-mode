@@ -32,6 +32,11 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./pages/calendario.component').then(m => m.CalendarioComponent),
       },
+      {
+        path: 'config',
+        loadComponent: () =>
+          import('./pages/config.component').then(m => m.ConfigComponent),
+      },
     ],
   },
   {

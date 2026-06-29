@@ -1,0 +1,84 @@
+name: Notificações FreakMode
+
+on:
+  schedule:
+    # Lembrete de treino — roda a cada hora das 10h às 22h UTC (7h–19h BRT)
+    - cron: '0 10-22 * * *'
+    # Ofensiva em risco — 1h UTC = 22h BRT
+    - cron: '0 1 * * *'
+    # Hidratação — 11,13,15,17,19,21,23h UTC = 8,10,12,14,16,18,20h BRT
+    - cron: '0 11,13,15,17,19,21,23 * * *'
+    # Resumo semanal — domingo 23h UTC = domingo 20h BRT
+    - cron: '0 23 * * 0'
+    # Lembrete de peso — segunda 11h UTC = segunda 8h BRT
+    - cron: '0 11 * * 1'
+  workflow_dispatch:
+    inputs:
+      tipo:
+        description: 'Tipo de notificação para testar'
+        required: true
+        default: 'treino'
+        type: choice
+        options: [treino, ofensiva, hidratacao, resumo, peso]
+
+jobs:
+  notificar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: .github/scripts/package.json
+
+      - name: Instalar dependências
+        run: npm install
+        working-directory: .github/scripts
+
+      - name: Determinar tipo de notificação
+        id: tipo
+        run: |
+          HORA_UTC=$(date -u +%H)
+          HORA_UTC=${HORA_UTC#0}  # remove zero à esquerda
+          DIA_SEMANA=$(date -u +%u)  # 1=segunda, 7=domingo
+
+          # workflow_dispatch manual
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tipo=${{ inputs.tipo }}" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Ofensiva: 1h UTC
+          if [ "$HORA_UTC" = "1" ]; then
+            echo "tipo=ofensiva" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Resumo: domingo 23h UTC
+          if [ "$DIA_SEMANA" = "7" ] && [ "$HORA_UTC" = "23" ]; then
+            echo "tipo=resumo" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Peso: segunda 11h UTC
+          if [ "$DIA_SEMANA" = "1" ] && [ "$HORA_UTC" = "11" ]; then
+            echo "tipo=peso" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Hidratação: horas pares 11-23 UTC
+          if echo "11 13 15 17 19 21 23" | grep -qw "$HORA_UTC"; then
+            echo "tipo=hidratacao" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Treino: demais horários
+          echo "tipo=treino" >> $GITHUB_OUTPUT
+
+      - name: Enviar notificações
+        run: node enviar-notificacoes.js --tipo ${{ steps.tipo.outputs.tipo }}
+        working-directory: .github/scripts
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}

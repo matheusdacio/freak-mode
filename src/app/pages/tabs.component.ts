@@ -29,6 +29,10 @@ import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
           <span class="ico">📊</span>
           <span class="lbl">Corpo</span>
         </a>
+        <a class="tab" routerLink="/config" routerLinkActive="ativo">
+          <span class="ico">⚙️</span>
+          <span class="lbl">Config</span>
+        </a>
       </div>
     </nav>
   `,
@@ -55,7 +59,7 @@ import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
         max-width: 560px;
         margin: 0 auto;
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(4, 1fr);
         padding: 0.4rem 0.5rem 0.3rem;
         gap: 0.3rem;
       }
