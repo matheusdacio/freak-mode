@@ -14,7 +14,7 @@ export interface ConfigNotificacoes {
 }
 
 // Gere em: Firebase Console → Project Settings → Cloud Messaging → Web Push certificates
-const VAPID_KEY = 'COLE_SUA_VAPID_KEY_AQUI';
+const VAPID_KEY = 'BAfSwnM7CgDw4QBefENh_nbA4wNqwpx2OQY84L7TUh5nSMGsnUpOx4bgxJcMzV6GcWPvK6rdJAKTkvM9KT29CmY';
 
 const DEFAULT_CONFIG: ConfigNotificacoes = {
   id: 'notificacoes',
