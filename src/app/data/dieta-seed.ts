@@ -1,88 +1,58 @@
-import { DietaPlano } from '@models/dieta.model';
+import { DietaPlano, MetasDieta, OrientacoesPlano } from '@models/dieta.model';
 
-// Plano alimentar do Matheus (Dietbox / nutri Talita Colaço, 18/06/2021).
-// Estrutura: refeição -> componente -> opções de substituição.
-// MACROS SÃO ESTIMATIVAS por porção (a nutri não passou números) — editáveis no app.
+// Plano alimentar de ganho de peso gradual (treinador, ago/2026).
+// 6 refeições/dia. Café, lanches e ceia são combos fechados (componente "Opção");
+// almoço e jantar são decompostos em componentes substituíveis, como no PDF.
+// MACROS SÃO ESTIMATIVAS calculadas a partir das porções do PDF (ele não traz números), editáveis no app.
+// Ids usam prefixo "g" para não colidir com os ids do plano anterior em dias de adesão antigos.
 
 type Op = [nome: string, porcao: string, kcal: number, p: number, c: number, g: number];
 interface CompSeed { nome: string; ops: Op[] }
 interface RefSeed { nome: string; horario: string; comps: CompSeed[] }
 
+const CARBO_ALMOCO: Op[] = [
+  ['Arroz branco', '5 a 6 c. sopa (150-180g)', 210, 4, 46, 0.5],
+  ['Batata cozida', 'porção equivalente (~250g)', 215, 5, 50, 0],
+  ['Mandioca cozida', '~170g', 210, 1, 50, 0.5],
+  ['Macarrão', '~2 pegadores (140g)', 220, 7, 43, 1.5],
+];
+
+const PROTEINA_ALMOCO: Op[] = [
+  ['Frango grelhado', '1 filé grande (150g)', 248, 47, 0, 5],
+  ['Carne moída magra', '4 a 5 c. sopa (150g)', 285, 40, 0, 13],
+  ['Patinho', '1 bife grande (150g)', 245, 43, 0, 7],
+  ['Ovos', '3 unid. (150g)', 235, 19, 1.5, 16.5],
+  ['Peixe (preço acessível)', '1 filé grande (150g)', 195, 39, 0, 4],
+];
+
+const FEIJAO: Op[] = [['Feijão', '1 concha (100g)', 76, 5, 14, 0.5]];
+const SALADA: Op[] = [['Salada e legumes variados', 'à vontade', 40, 2, 8, 0]];
+
 const DADOS: RefSeed[] = [
   {
     nome: 'Café da manhã',
-    horario: '06:30',
+    horario: '07:30',
     comps: [
-      { nome: 'Bebida', ops: [['Café sem açúcar', 'à vontade', 0, 0, 0, 0]] },
       {
-        nome: 'Carboidrato',
+        nome: 'Opção',
         ops: [
-          ['Pão integral', '2 fatias (50g)', 130, 6, 24, 2],
-          ['Batata doce cozida', '6 rodelas méd. (130g)', 112, 2, 26, 0],
-          ['Aipim cozido', '1 unid. média (80g)', 100, 1, 24, 0],
-          ['Aveia', '4 c. sopa (35g)', 136, 5, 24, 3],
-          ['Granola', '2 c. sopa (35g)', 150, 4, 24, 5],
-          ['Rosca de polvilho', '2 pedaços méd. (34g)', 120, 1, 20, 4],
-          ['Biscoito integral/gergelim', '6 unid. (40g)', 180, 4, 26, 6],
-          ['Tapioca', '4 c. sopa (40g)', 140, 0, 34, 0],
-          ['Torrada integral/multigrão', '4 unid. (40g)', 150, 5, 28, 3],
-          ['Bolo integral s/ açúcar', '1 fatia méd. (60g)', 180, 4, 28, 6],
+          ['Ovos + pão francês + banana', '3 ovos + 2 pães franceses + 1 banana', 625, 29, 82, 19.5],
+          ['Ovos + pão integral + mamão', '3 ovos + 4 fatias de pão integral + 1 fatia de mamão', 555, 32, 64.5, 20.5],
+          ['Vitamina + ovos', '300ml leite + 1 banana + 30g aveia + 30g whey + 2 ovos', 665, 52, 61, 25],
         ],
       },
-      {
-        nome: 'Gordura',
-        ops: [
-          ['Manteiga', '1 c. sob. (5g)', 36, 0, 0, 4],
-          ['Azeite de oliva', '1 c. sob. rasa (5g)', 44, 0, 0, 5],
-          ['Abacate/guacamole', '1 c. sopa (30g)', 48, 1, 3, 4],
-          ['Pasta de amendoim', '1/2 c. sopa (10g)', 60, 2.5, 2, 5],
-        ],
-      },
-      {
-        nome: 'Proteína',
-        ops: [
-          ['Ovo mexido', '1 unid. (50g)', 90, 6, 0.5, 7],
-          ['Ricota', '1 fatia grossa (25g)', 35, 3, 1, 2],
-          ['Creme de ricota', '2 c. sopa', 60, 3, 2, 4],
-          ['Cottage', '3 c. sopa (50g)', 50, 6, 2, 2],
-          ['Requeijão', '1 c. sopa (13g)', 35, 1.5, 1, 3],
-          ['Queijo minas', '1 fatia (25g)', 60, 4, 1, 4],
-          ['Patê de atum c/ iogurte', '2 c. sopa', 70, 8, 1, 4],
-        ],
-      },
-      { nome: 'Fruta', ops: [['1 porção de frutas', '1 porção', 70, 1, 17, 0]] },
     ],
   },
   {
     nome: 'Lanche da manhã',
-    horario: '09:30',
+    horario: '10:00',
     comps: [
-      { nome: 'Fruta', ops: [['1 porção de frutas', '1 porção', 70, 1, 17, 0]] },
       {
-        nome: 'Oleaginosa',
+        nome: 'Opção',
         ops: [
-          ['Castanha do Brasil', '2 unid. grandes (8g)', 52, 1, 1, 5],
-          ['Amêndoa', '8 unid. (9g)', 54, 2, 2, 5],
-          ['Caju', '4 unid. (9g)', 52, 1.5, 3, 4],
-          ['Nozes', '3,5 unid. (8g)', 52, 1, 1, 5],
-          ['Coco', '1 pedaço peq. (15g)', 50, 0.5, 2, 5],
-          ['Abacate', '2 c. sopa (60g)', 96, 1, 5, 9],
-          ['Pasta de amendoim', '0,5 c. sopa (8g)', 48, 2, 1.5, 4],
-          ['Semente de girassol', '2 c. sopa (8g)', 46, 1.5, 1.5, 4],
-          ['Pistache', '1 c. sopa (9g)', 52, 2, 2.5, 4],
-          ['Macadâmia', '3,5 unid. (7g)', 50, 0.5, 1, 5],
-        ],
-      },
-      {
-        nome: 'Laticínio/Proteína',
-        ops: [
-          ['Iogurte natural desnatado/kefir', '200ml (1 copo)', 90, 10, 12, 0],
-          ['Leite desnatado', '200ml (1 copo)', 70, 7, 10, 0],
-          ['Grego simples', '100g (½ copo)', 100, 9, 4, 5],
-          ['Leite em pó desnatado', '2 c. sopa (20g)', 72, 7, 11, 0],
-          ['Leite fermentado', '100ml (½ copo)', 70, 2, 15, 0],
-          ['Suco verde', '200ml (1 copo)', 80, 2, 18, 0],
-          ['Whey protein', '1 scoop (25g)', 100, 20, 2, 1.5],
+          ['Iogurte + banana + aveia', '1 iogurte natural + 1 banana + 30g aveia', 310, 11, 51, 7.5],
+          ['Sanduíche de ovos', '2 fatias de pão + 2 ovos', 285, 19, 25, 13],
+          ['Vitamina', '250ml leite + 1 banana + 20-30g aveia + 30g whey', 460, 36.5, 55, 11.5],
         ],
       },
     ],
@@ -91,183 +61,102 @@ const DADOS: RefSeed[] = [
     nome: 'Almoço',
     horario: '12:00',
     comps: [
-      {
-        nome: 'Carboidrato',
-        ops: [
-          ['Arroz integral', '4 c. sopa (100g)', 124, 3, 26, 1],
-          ['Arroz 7 grãos', '4 c. sopa (100g)', 130, 3, 27, 1],
-          ['Batata doce', '7 fatias méd. (160g)', 138, 2, 32, 0],
-          ['Batata salsa', '2 unid. peq. (160g)', 140, 3, 30, 0],
-          ['Aipim', '1 unid. méd. (100g)', 125, 1, 30, 0],
-          ['Polenta', '4 c. servir (120g)', 110, 2, 24, 1],
-          ['Macarrão integral', '2 c. servir (100g)', 150, 6, 30, 1.5],
-          ['Moranga', '6 c. sopa (300g)', 120, 3, 24, 1],
-          ['Milho verde', '5 c. sopa (120g)', 115, 4, 24, 1.5],
-          ['Quinoa em grãos', '~100g cozida', 120, 4, 21, 2],
-        ],
-      },
-      {
-        nome: 'Leguminosa',
-        ops: [
-          ['Feijão', '1 concha peq. (100g)', 76, 5, 13, 0.5],
-          ['Feijão branco', '½ concha (50g)', 70, 5, 12, 0.5],
-          ['Grão de bico', '2,5 c. sopa (50g)', 82, 4, 14, 1.5],
-          ['Lentilha', '4,5 c. sopa (85g)', 98, 7, 17, 0.4],
-          ['Ervilha', '6 c. sopa (90g)', 75, 5, 13, 0.4],
-          ['Vagem', '5,5 c. sopa (90g)', 30, 2, 6, 0],
-        ],
-      },
-      {
-        nome: 'Proteína',
-        ops: [
-          ['Carne bovina magra', '1 bife méd. (100g)', 190, 28, 0, 8],
-          ['Frango grelhado', '1 filé méd. (100g)', 165, 31, 0, 4],
-          ['Ovo', '2 unid. (100g)', 155, 13, 1, 11],
-          ['Peixe (salmão/tilápia/atum)', '1 filé méd. (100g)', 120, 22, 0, 3],
-        ],
-      },
-      { nome: 'Salada crua', ops: [['Salada (mín. 3 tipos)', 'à vontade', 25, 1, 5, 0]] },
-      { nome: 'Legumes cozidos', ops: [['Legumes cozidos', 'à vontade', 40, 2, 8, 0]] },
-      {
-        nome: 'Gordura',
-        ops: [
-          ['Azeite de oliva', '1 c. sopa (10g)', 88, 0, 0, 10],
-          ['Abacate/guacamole', '1 c. sopa', 50, 1, 3, 4.5],
-        ],
-      },
-    ],
-  },
-  {
-    nome: 'Lanche da tarde',
-    horario: '15:00',
-    comps: [
-      { nome: 'Bebida', ops: [['Café sem açúcar', 'à vontade', 0, 0, 0, 0]] },
-      {
-        nome: 'Laticínio',
-        ops: [
-          ['Leite semidesnatado', '100ml (½ copo)', 50, 3.5, 5, 2],
-          ['Iogurte natural desnatado/kefir', '100ml (½ copo)', 45, 5, 6, 0],
-          ['Grego simples', '65g (1/3 copo)', 65, 6, 2.5, 3],
-          ['Leite em pó desnatado', '1 c. sopa (10g)', 36, 3.5, 5.5, 0],
-          ['Leite fermentado', '50ml (¼ copo)', 35, 1, 7.5, 0],
-          ['Suco verde', '200ml (1 copo)', 80, 2, 18, 0],
-        ],
-      },
-      {
-        nome: 'Carboidrato',
-        ops: [
-          ['Pão integral', '1 fatia (25g)', 65, 3, 12, 1],
-          ['Batata doce', '3 rodelas méd. (65g)', 56, 1, 13, 0],
-          ['Aipim cozido', '½ unid. méd. (40g)', 50, 0.5, 12, 0],
-          ['Aveia', '2 c. sopa (18g)', 70, 2.5, 12, 1.5],
-          ['Granola', '1 c. sopa (18g)', 78, 2, 12, 2.5],
-          ['Rosca de polvilho', '1 pedaço méd. (17g)', 60, 0.5, 10, 2],
-          ['Biscoito integral/gergelim', '3 unid. (20g)', 90, 2, 13, 3],
-          ['Tapioca', '2 c. sopa (20g)', 70, 0, 17, 0],
-          ['Torrada integral', '2 unid. (20g)', 75, 2.5, 14, 1.5],
-          ['Bolo integral s/ açúcar', '1 fatia peq. (30g)', 90, 2, 14, 3],
-          ['Cookies integral', '3 unid. peq.', 110, 2, 16, 4],
-        ],
-      },
-      {
-        nome: 'Proteína',
-        ops: [
-          ['Ricota', '1 fatia grossa (25g)', 35, 3, 1, 2],
-          ['Ovo mexido', '1 unid. (50g)', 78, 6, 0.5, 5.5],
-          ['Cottage', '3 c. sopa (50g)', 50, 6, 2, 2],
-          ['Requeijão', '1 c. sopa (13g)', 35, 1.5, 1, 3],
-          ['Queijo minas', '1 fatia (25g)', 60, 4, 1, 4],
-          ['Patê de atum c/ iogurte', '2 c. sopa', 70, 8, 1, 4],
-        ],
-      },
+      { nome: 'Carboidrato', ops: CARBO_ALMOCO },
+      { nome: 'Leguminosa', ops: FEIJAO },
+      { nome: 'Proteína', ops: PROTEINA_ALMOCO },
+      { nome: 'Salada / Legumes', ops: SALADA },
       { nome: 'Fruta', ops: [['1 porção de frutas', '1 porção', 70, 1, 17, 0]] },
     ],
   },
   {
-    nome: 'Lanche da tarde 2',
-    horario: '18:00',
+    nome: 'Lanche da tarde',
+    horario: '15:30',
     comps: [
       {
-        nome: 'Carboidrato',
+        nome: 'Opção',
         ops: [
-          ['Pão integral', '2 fatias (50g)', 130, 6, 24, 2],
-          ['Rap 10 integral', '1 unid.', 120, 4, 22, 2],
-          ['Pão sírio integral', '1 unid. peq.', 130, 5, 26, 1.5],
-          ['Tapioca + chia/linhaça', '2 c. sopa (20g)', 80, 1, 18, 1],
-          ['Aipim cozido', '1½ unid. méd. (115g)', 145, 1, 35, 0],
-          ['Batata doce cozida', '7,5 rodelas méd. (185g)', 160, 2.5, 37, 0],
+          ['Pão francês + frango desfiado', '2 pães + 100g de frango', 465, 40, 58, 6.5],
+          ['Arroz + frango', '150g de arroz + 120g de frango', 395, 41, 42, 4.5],
+          ['Tapioca + ovos + fruta', '1 tapioca + 3 ovos + 1 fruta', 445, 20, 52.5, 16.5],
         ],
-      },
-      {
-        nome: 'Proteína',
-        ops: [
-          ['Frango', '½ filé (50g)', 82, 15, 0, 2],
-          ['Atum em conserva', '3 c. sopa (60g)', 80, 14, 0, 2.5],
-          ['Sardinha em conserva', '1 unid. méd. (60g)', 120, 14, 0, 7],
-          ['Carne moída magra', '3 c. sopa (45g)', 90, 12, 0, 4.5],
-          ['Ovo', '1 unid. (50g)', 78, 6, 0.5, 5.5],
-        ],
-      },
-      {
-        nome: 'Vegetais',
-        ops: [['Tomate (3) + alface (3) + cenoura ralada (1 c.sp)', 'fixo', 18, 0.6, 3.5, 0]],
       },
     ],
   },
   {
     nome: 'Jantar',
-    horario: '21:00',
+    horario: '18:30',
+    comps: [
+      { nome: 'Carboidrato', ops: CARBO_ALMOCO },
+      { nome: 'Leguminosa', ops: FEIJAO },
+      { nome: 'Proteína', ops: PROTEINA_ALMOCO },
+      { nome: 'Salada / Legumes', ops: SALADA },
+    ],
+  },
+  {
+    nome: 'Ceia',
+    horario: '23:00',
     comps: [
       {
-        nome: 'Carboidrato',
+        nome: 'Opção',
         ops: [
-          ['Arroz integral', '3 c. sopa (75g)', 93, 2, 20, 0.8],
-          ['Arroz 7 grãos', '3 c. sopa (75g)', 98, 2.5, 20, 0.8],
-          ['Batata doce', '5 fatias méd. (120g)', 104, 1.5, 24, 0],
-          ['Batata salsa', '1 unid. peq. (80g)', 70, 1.5, 15, 0],
-          ['Aipim', '1 unid. peq. (75g)', 94, 0.7, 22, 0],
-          ['Polenta', '3 c. servir (90g)', 82, 1.5, 18, 0.7],
-          ['Macarrão integral', '1½ c. servir (75g)', 112, 4.5, 22, 1],
-          ['Moranga', '5 c. sopa (280g)', 112, 3, 22, 1],
-          ['Milho verde', '4 c. sopa (90g)', 86, 3, 18, 1],
-          ['Quinoa em grãos', '~75g cozida', 90, 3, 16, 1.5],
-        ],
-      },
-      {
-        nome: 'Proteína',
-        ops: [
-          ['Carne bovina magra', '1 bife méd. (100g)', 190, 28, 0, 8],
-          ['Frango grelhado', '1 filé méd. (100g)', 165, 31, 0, 4],
-          ['Ovo', '2 unid. (100g)', 155, 13, 1, 11],
-          ['Peixe (salmão/tilápia/atum)', '1 filé méd. (100g)', 120, 22, 0, 3],
-        ],
-      },
-      { nome: 'Salada crua', ops: [['Salada (mín. 3 tipos)', 'à vontade', 25, 1, 5, 0]] },
-      { nome: 'Legumes cozidos', ops: [['Legumes cozidos', 'à vontade', 40, 2, 8, 0]] },
-      {
-        nome: 'Gordura',
-        ops: [
-          ['Azeite de oliva', '1 c. sopa (10g)', 88, 0, 0, 10],
-          ['Abacate/guacamole', '1 c. sopa', 50, 1, 3, 4.5],
+          ['Vitamina', '300ml leite + 1 banana + 30g aveia + 30g whey', 510, 39, 60, 14],
+          ['Iogurte + aveia + banana', '1 iogurte natural + 30g aveia + 1 banana', 310, 11, 51, 7.5],
+          ['Ovos + pão integral', '3 ovos + 2 fatias de pão integral', 365, 25, 25.5, 18.5],
         ],
       },
     ],
   },
 ];
 
-/** Monta o DietaPlano com ids estáveis (r{i}, r{i}c{j}, r{i}c{j}o{k}). */
-export function planoMatheus(): DietaPlano {
+const ORIENTACOES: OrientacoesPlano = {
+  estrategia:
+    'Superávit moderado (2.500 a 2.600 kcal/dia) para ganho de massa sem acelerar o acúmulo de gordura. ' +
+    'Acompanhar o peso pela média de 3 a 4 pesagens semanais, sempre em condições semelhantes. ' +
+    'Se após 2 a 3 semanas o peso não apresentar tendência de alta, acrescentar 100 a 150 kcal/dia.',
+  basicos: [
+    { categoria: 'Carboidratos', itens: 'Arroz, feijão, pão, aveia, macarrão, batata, mandioca, tapioca' },
+    { categoria: 'Proteínas', itens: 'Ovos, frango, carne moída magra, patinho, leite, iogurte, whey protein' },
+    { categoria: 'Frutas e complementos', itens: 'Banana, mamão, maçã, frutas da estação, verduras e legumes' },
+  ],
+  rotacaoSemanal: [
+    { dia: 'Segunda', proteina: 'Frango', carboidrato: 'Arroz + feijão' },
+    { dia: 'Terça', proteina: 'Carne moída', carboidrato: 'Macarrão' },
+    { dia: 'Quarta', proteina: 'Frango', carboidrato: 'Batata + arroz' },
+    { dia: 'Quinta', proteina: 'Ovos + carne', carboidrato: 'Arroz + feijão' },
+    { dia: 'Sexta', proteina: 'Frango', carboidrato: 'Macarrão ou mandioca' },
+    { dia: 'Sábado', proteina: 'Carne magra', carboidrato: 'Arroz + feijão' },
+    { dia: 'Domingo', proteina: 'Frango, carne ou peixe', carboidrato: 'Batata, arroz ou macarrão' },
+  ],
+  progressao: [
+    { situacao: 'Peso subindo de forma lenta e consistente', ajuste: 'Manter as quantidades atuais.' },
+    { situacao: 'Peso praticamente parado', ajuste: 'Adicionar 100 a 150 kcal/dia (mais arroz, aveia, pão ou leite).' },
+    { situacao: 'Peso subindo rápido e cintura aumentando muito', ajuste: 'Evitar novo aumento de calorias e reavaliar as porções.' },
+  ],
+  observacao:
+    'As quantidades são um ponto de partida e podem precisar de ajuste conforme rotina, treino, apetite e evolução do peso. ' +
+    'Referência do plano: 71,1 kg, 15,9% de gordura corporal e ingestão estimada de 2.268 kcal/dia. ' +
+    'Em caso de alergias, intolerâncias ou condições clínicas, revisar com nutricionista.',
+};
+
+/** Metas diárias derivadas do plano (meta de 2.500 a 2.600 kcal). */
+export function metasGanhoDePeso(): MetasDieta {
+  return { id: 'metas-dieta', kcal: 2550, proteina: 180, carbo: 300, gordura: 70 };
+}
+
+/** Monta o DietaPlano com ids estáveis (g{i}, g{i}c{j}, g{i}c{j}o{k}). */
+export function planoGanhoDePeso(): DietaPlano {
   return {
     id: 'plano',
+    orientacoes: ORIENTACOES,
     refeicoes: DADOS.map((r, i) => ({
-      id: `r${i}`,
+      id: `g${i}`,
       nome: r.nome,
       horario: r.horario,
       componentes: r.comps.map((c, j) => ({
-        id: `r${i}c${j}`,
+        id: `g${i}c${j}`,
         nome: c.nome,
         opcoes: c.ops.map((o, k) => ({
-          id: `r${i}c${j}o${k}`,
+          id: `g${i}c${j}o${k}`,
           nome: o[0],
           porcao: o[1],
           kcal: o[2],

@@ -25,10 +25,39 @@ export interface RefeicaoPlano {
   componentes: Componente[];
 }
 
+/** Linha da rotação semanal sugerida (proteína/carbo principal do dia). */
+export interface RotacaoDia {
+  dia: string;
+  proteina: string;
+  carboidrato: string;
+}
+
+/** Regra de progressão de calorias conforme a evolução do peso. */
+export interface RegraProgressao {
+  situacao: string;
+  ajuste: string;
+}
+
+/** Categoria de alimentos-base para manter em casa. */
+export interface CategoriaBasicos {
+  categoria: string;
+  itens: string;
+}
+
+/** Orientações gerais do plano (estratégia, rotação semanal, progressão). */
+export interface OrientacoesPlano {
+  estrategia?: string;
+  basicos?: CategoriaBasicos[];
+  rotacaoSemanal?: RotacaoDia[];
+  progressao?: RegraProgressao[];
+  observacao?: string;
+}
+
 /** Plano de dieta FIXO — vale todo dia. Documento único (id 'plano'). */
 export interface DietaPlano {
   readonly id: string;
   refeicoes: RefeicaoPlano[];
+  orientacoes?: OrientacoesPlano;
 }
 
 /** Adesão de um dia: qual opção foi escolhida em cada componente. id = YYYY-MM-DD. */

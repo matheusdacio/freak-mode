@@ -46,7 +46,7 @@ type Overlay = 'none' | 'opcao' | 'metas';
           <span class="vazio-emoji">🥗</span>
           <p class="muted">Seu plano está vazio.</p>
           <button class="btn btn-primary btn-block" (click)="importar()">
-            Importar minha dieta (Dietbox)
+            Importar plano do treinador (ganho de peso)
           </button>
           <button class="btn btn-ghost btn-block" (click)="editando.set(true)">Montar do zero</button>
         </div>
@@ -169,8 +169,67 @@ type Overlay = 'none' | 'opcao' | 'metas';
           </section>
         }
 
+        @if (!editando()) {
+          @if (p.orientacoes; as ori) {
+            <section class="ref anim-in">
+              <div class="ref-head">
+                <button class="ref-titulo" (click)="oriAberta.set(!oriAberta())">
+                  <span class="chev">{{ oriAberta() ? '▾' : '▸' }}</span>
+                  <h2>Orientações</h2>
+                </button>
+              </div>
+
+              @if (oriAberta()) {
+                @if (ori.estrategia) {
+                  <p class="ori-txt">{{ ori.estrategia }}</p>
+                }
+
+                @if (ori.rotacaoSemanal?.length) {
+                  <div class="ori-bloco">
+                    <span class="ori-cap">Rotação da semana</span>
+                    <table class="ori-tab">
+                      @for (dia of ori.rotacaoSemanal; track dia.dia; let i = $index) {
+                        <tr [class.hoje]="i === diaSemanaIdx()">
+                          <td>{{ dia.dia }}</td>
+                          <td>{{ dia.proteina }}</td>
+                          <td>{{ dia.carboidrato }}</td>
+                        </tr>
+                      }
+                    </table>
+                  </div>
+                }
+
+                @if (ori.progressao?.length) {
+                  <div class="ori-bloco">
+                    <span class="ori-cap">Progressão de calorias</span>
+                    @for (regra of ori.progressao; track regra.situacao) {
+                      <p class="ori-item"><strong>{{ regra.situacao }}:</strong> {{ regra.ajuste }}</p>
+                    }
+                  </div>
+                }
+
+                @if (ori.basicos?.length) {
+                  <div class="ori-bloco">
+                    <span class="ori-cap">Base para manter em casa</span>
+                    @for (b of ori.basicos; track b.categoria) {
+                      <p class="ori-item"><strong>{{ b.categoria }}:</strong> {{ b.itens }}</p>
+                    }
+                  </div>
+                }
+
+                @if (ori.observacao) {
+                  <p class="ori-obs muted">{{ ori.observacao }}</p>
+                }
+              }
+            </section>
+          }
+        }
+
         @if (editando()) {
           <button class="btn btn-ghost nova-ref" (click)="adicionarRefeicao()">＋ Nova refeição</button>
+          <button class="btn btn-ghost nova-ref reimportar" (click)="reimportar()">
+            ↺ Substituir pelo plano do treinador
+          </button>
         }
       }
     } @else {
@@ -279,6 +338,19 @@ type Overlay = 'none' | 'opcao' | 'metas';
       .add-op { font-size: 0.78rem; font-weight: 600; color: var(--accent-2); padding: 0.35rem 0.2rem; }
       .add-comp { margin-top: 0.4rem; font-size: 0.78rem; font-weight: 700; color: var(--muted); border: 1px dashed var(--line-strong); border-radius: var(--radius-sm); padding: 0.4rem; width: 100%; }
       .nova-ref { width: 100%; margin: 0.2rem 0 1rem; }
+      .reimportar { margin-top: -0.6rem; color: var(--muted); }
+
+      .ori-txt { font-size: 0.8rem; line-height: 1.45; margin: 0.2rem 0 0.6rem; }
+      .ori-bloco { border-top: 1px solid var(--line); padding: 0.55rem 0; }
+      .ori-cap { display: block; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.12em; font-weight: 800; color: var(--accent-2); margin-bottom: 0.35rem; }
+      .ori-tab { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+      .ori-tab td { padding: 0.24rem 0.35rem; border-bottom: 1px solid var(--line); }
+      .ori-tab td:first-child { font-weight: 700; white-space: nowrap; }
+      .ori-tab tr:last-child td { border-bottom: none; }
+      .ori-tab tr.hoje td { background: var(--accent-soft); }
+      .ori-tab tr.hoje td:first-child { color: var(--accent-2); }
+      .ori-item { font-size: 0.78rem; line-height: 1.4; margin: 0.25rem 0; }
+      .ori-obs { font-size: 0.7rem; line-height: 1.4; margin-top: 0.55rem; }
 
       .vazio { text-align: center; padding: 1.5rem 1rem; display: flex; flex-direction: column; gap: 0.7rem; align-items: center; }
       .vazio-emoji { font-size: 2.2rem; }
@@ -303,13 +375,20 @@ export class DietaComponent implements OnInit {
 
   protected readonly plano = signal<DietaPlano | undefined>(undefined);
   protected readonly metas = signal<MetasDieta>({
-    id: 'metas-dieta', kcal: 2000, proteina: 150, carbo: 200, gordura: 60,
+    id: 'metas-dieta', kcal: 2550, proteina: 180, carbo: 300, gordura: 70,
   });
   protected readonly dataAtual = signal<string>('');
   protected readonly adesao = signal<DiaAdesao>({ id: '', data: '', escolhas: {} });
   protected readonly editando = signal(false);
   protected readonly expandidos = signal<Set<string>>(new Set());
   protected readonly minimizadas = signal<Set<string>>(new Set());
+  protected readonly oriAberta = signal(false);
+
+  /** Índice do dia visualizado na rotação semanal (Segunda = 0 ... Domingo = 6). */
+  protected readonly diaSemanaIdx = computed(() => {
+    const [y, m, d] = (this.dataAtual() || this.svc.hoje()).split('-').map(Number);
+    return (new Date(y, m - 1, d).getDay() + 6) % 7;
+  });
 
   protected readonly overlay = signal<Overlay>('none');
   private editCtx: { refId: string; compId: string } = { refId: '', compId: '' };
@@ -354,7 +433,18 @@ export class DietaComponent implements OnInit {
   }
 
   protected async importar(): Promise<void> {
-    this.plano.set(await this.svc.importarPlanoMatheus());
+    const { plano, metas } = await this.svc.importarPlanoTreinador();
+    this.plano.set(plano);
+    this.metas.set(metas);
+  }
+
+  protected async reimportar(): Promise<void> {
+    const ok = confirm(
+      'Substituir o plano atual pelo plano do treinador (ganho de peso)? As refeições e opções atuais serão perdidas.',
+    );
+    if (!ok) return;
+    await this.importar();
+    this.editando.set(false);
   }
 
   // ---- dia ----

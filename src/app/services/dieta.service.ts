@@ -9,7 +9,7 @@ import {
   OpcaoAlimento,
   RefeicaoPlano,
 } from '@models/dieta.model';
-import { planoMatheus } from '../data/dieta-seed';
+import { metasGanhoDePeso, planoGanhoDePeso } from '../data/dieta-seed';
 
 function uid(): string {
   return crypto.randomUUID();
@@ -17,13 +17,7 @@ function uid(): string {
 
 const PLANO_ID = 'plano';
 const METAS_ID = 'metas-dieta';
-const METAS_PADRAO: MetasDieta = {
-  id: METAS_ID,
-  kcal: 2000,
-  proteina: 150,
-  carbo: 200,
-  gordura: 60,
-};
+const METAS_PADRAO: MetasDieta = metasGanhoDePeso();
 
 @Injectable({ providedIn: 'root' })
 export class DietaService {
@@ -57,11 +51,13 @@ export class DietaService {
     await this.db.put('dieta', { ...plano, id: PLANO_ID });
   }
 
-  /** Carrega o plano pré-montado do Matheus (Dietbox) e salva. */
-  async importarPlanoMatheus(): Promise<DietaPlano> {
-    const plano = planoMatheus();
+  /** Carrega o plano do treinador (ganho de peso) e salva plano + metas. */
+  async importarPlanoTreinador(): Promise<{ plano: DietaPlano; metas: MetasDieta }> {
+    const plano = planoGanhoDePeso();
+    const metas = metasGanhoDePeso();
     await this.salvarPlano(plano);
-    return plano;
+    await this.salvarMetas(metas);
+    return { plano, metas };
   }
 
   // ---- Adesão do dia ----
