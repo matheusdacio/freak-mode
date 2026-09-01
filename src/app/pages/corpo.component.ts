@@ -58,10 +58,25 @@ import { LineChartComponent } from '../shared/line-chart.component';
       </div>
 
       @if (pesoSerie().length >= 2) {
-        <app-line-chart [valores]="pesoSerie()" />
+        <app-line-chart [valores]="pesoSerie()" [media]="pesoMedia7()" />
+        <div class="legenda muted">
+          <span class="leg leg--bruto">Pesagem</span>
+          <span class="leg leg--media">Média de 7 dias</span>
+        </div>
       } @else if (pesos().length === 0) {
         <p class="vazio-msg muted">Registre seu peso pra começar a acompanhar a evolução.</p>
       }
+
+      <div class="tendencia" [class.tendencia--vazia]="tendencia() === null">
+        @if (tendencia(); as t) {
+          <span class="tend-valor" [class.up]="t > 0" [class.down]="t < 0">
+            {{ t > 0 ? '▲' : t < 0 ? '▼' : '' }}{{ absTendencia() }} g/semana
+          </span>
+          <span class="tend-label muted">tendência ({{ diasTendencia() }} dias, {{ pesosTendencia() }} pesagens)</span>
+        } @else {
+          <span class="tend-label muted">{{ motivoSemTendencia() }}</span>
+        }
+      </div>
 
       <div class="registrar">
         <input
@@ -142,7 +157,21 @@ import { LineChartComponent } from '../shared/line-chart.component';
       .chip:active { border-color: #4aa8ff; color: #4aa8ff; }
       .chip--menos { flex: 0 0 auto; min-width: 0; color: var(--muted); }
 
-      app-line-chart { display: block; margin: 0.3rem 0 0.8rem; }
+      app-line-chart { display: block; margin: 0.3rem 0 0.4rem; }
+
+      .legenda { display: flex; gap: 0.9rem; font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; }
+      .leg { display: inline-flex; align-items: center; gap: 0.3rem; }
+      .leg::before { content: ''; width: 14px; height: 0; border-top-width: 2px; border-top-style: solid; }
+      .leg--bruto::before { border-top-color: var(--accent); }
+      .leg--media::before { border-top-color: var(--accent-2); border-top-style: dashed; }
+
+      /* No plano de ganho, subir é o resultado desejado: cores invertidas em relação ao .delta. */
+      .tendencia { display: flex; align-items: baseline; gap: 0.45rem; flex-wrap: wrap; margin: 0.7rem 0 0.2rem; padding-top: 0.7rem; border-top: 1px solid var(--line); }
+      .tend-valor { font-family: var(--font-display); font-size: 1.15rem; }
+      .tend-valor.up { color: #3ddc84; }
+      .tend-valor.down { color: var(--danger); }
+      .tend-label { font-size: 0.72rem; line-height: 1.4; }
+      .tendencia--vazia { font-size: 0.72rem; }
       .registrar { display: flex; gap: 0.5rem; margin-top: 0.6rem; }
       .registrar .field { flex: 1; }
       .vazio-msg { font-size: 0.85rem; line-height: 1.5; padding: 0.5rem 0 0.8rem; }
@@ -171,7 +200,84 @@ export class CorpoComponent implements OnInit {
   protected pesoInput: number | null = null;
   protected medForm: Record<string, number | null> = {};
 
+  /** Dias considerados na média móvel e na tendência. */
+  private readonly JANELA_MEDIA = 7;
+  private readonly JANELA_TEND = 21;
+  private readonly MIN_PESAGENS_TEND = 4;
+  private readonly MIN_DIAS_TEND = 10;
+
   protected readonly pesoSerie = computed(() => this.pesos().map((p) => p.peso));
+
+  private dias(data: string): number {
+    const [a, m, d] = data.split('-').map(Number);
+    return Math.round(Date.UTC(a, m - 1, d) / 86400000);
+  }
+
+  /**
+   * Média móvel de 7 dias de calendário (não de 7 registros), porque as pesagens
+   * são esparsas. Cada ponto é a média das pesagens dentro da janela que termina nele.
+   * Retorna null quando a janela tem menos de 2 pesagens, para não desenhar média falsa.
+   */
+  protected readonly pesoMedia7 = computed<(number | null)[]>(() => {
+    const ps = this.pesos();
+    return ps.map((p, i) => {
+      const fim = this.dias(p.data);
+      const janela = ps
+        .slice(0, i + 1)
+        .filter((q) => fim - this.dias(q.data) < this.JANELA_MEDIA);
+      if (janela.length < 2) return null;
+      const soma = janela.reduce((acc, q) => acc + q.peso, 0);
+      return Math.round((soma / janela.length) * 100) / 100;
+    });
+  });
+
+  /** Pesagens dentro da janela de tendência (últimos 21 dias de calendário). */
+  private readonly janelaTendencia = computed<RegistroPeso[]>(() => {
+    const ps = this.pesos();
+    if (ps.length === 0) return [];
+    const fim = this.dias(ps.at(-1)!.data);
+    return ps.filter((p) => fim - this.dias(p.data) < this.JANELA_TEND);
+  });
+
+  protected readonly pesosTendencia = computed(() => this.janelaTendencia().length);
+  protected readonly diasTendencia = computed(() => {
+    const j = this.janelaTendencia();
+    if (j.length < 2) return 0;
+    return this.dias(j.at(-1)!.data) - this.dias(j[0].data) + 1;
+  });
+
+  /**
+   * Tendência em g/semana por regressão linear sobre a janela, usando a data real
+   * como eixo x. Regressão em vez de "último menos primeiro" para que uma pesagem
+   * fora da curva não dite o resultado. null = amostra insuficiente.
+   */
+  protected readonly tendencia = computed<number | null>(() => {
+    const j = this.janelaTendencia();
+    if (j.length < this.MIN_PESAGENS_TEND) return null;
+    if (this.diasTendencia() < this.MIN_DIAS_TEND) return null;
+    const x0 = this.dias(j[0].data);
+    const xs = j.map((p) => this.dias(p.data) - x0);
+    const ys = j.map((p) => p.peso);
+    const n = j.length;
+    const mx = xs.reduce((a, b) => a + b, 0) / n;
+    const my = ys.reduce((a, b) => a + b, 0) / n;
+    const num = xs.reduce((acc, x, i) => acc + (x - mx) * (ys[i] - my), 0);
+    const den = xs.reduce((acc, x) => acc + (x - mx) ** 2, 0);
+    if (den === 0) return null;
+    // kg/dia -> g/semana
+    return Math.round((num / den) * 7 * 1000);
+  });
+
+  protected readonly absTendencia = computed(() => Math.abs(this.tendencia() ?? 0));
+
+  protected readonly motivoSemTendencia = computed(() => {
+    const n = this.pesosTendencia();
+    if (n < this.MIN_PESAGENS_TEND) {
+      const faltam = this.MIN_PESAGENS_TEND - n;
+      return `Faltam ${faltam} ${faltam === 1 ? 'pesagem' : 'pesagens'} nos últimos 21 dias para calcular a tendência.`;
+    }
+    return `Pesagens concentradas em ${this.diasTendencia()} dias. Precisa de pelo menos ${this.MIN_DIAS_TEND} dias de intervalo.`;
+  });
   protected readonly pesoAtual = computed(() => this.pesos().at(-1)?.peso ?? 0);
   protected readonly pesoDelta = computed<number | null>(() => {
     const ps = this.pesos();

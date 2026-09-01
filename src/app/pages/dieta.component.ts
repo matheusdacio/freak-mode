@@ -375,7 +375,7 @@ export class DietaComponent implements OnInit {
 
   protected readonly plano = signal<DietaPlano | undefined>(undefined);
   protected readonly metas = signal<MetasDieta>({
-    id: 'metas-dieta', kcal: 2550, proteina: 180, carbo: 300, gordura: 70,
+    id: 'metas-dieta', kcal: 2950, proteina: 195, carbo: 370, gordura: 75,
   });
   protected readonly dataAtual = signal<string>('');
   protected readonly adesao = signal<DiaAdesao>({ id: '', data: '', escolhas: {} });

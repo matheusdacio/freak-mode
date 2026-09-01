@@ -4,6 +4,7 @@ import { DietaPlano, MetasDieta, OrientacoesPlano } from '@models/dieta.model';
 // 6 refeições/dia. Café, lanches e ceia são combos fechados (componente "Opção");
 // almoço e jantar são decompostos em componentes substituíveis, como no PDF.
 // MACROS SÃO ESTIMATIVAS calculadas a partir das porções do PDF (ele não traz números), editáveis no app.
+// Set/2026: porções de carboidrato aumentadas (arroz 165g->200g e equivalentes) após perda de ~0,8 kg no plano anterior.
 // Ids usam prefixo "g" para não colidir com os ids do plano anterior em dias de adesão antigos.
 
 type Op = [nome: string, porcao: string, kcal: number, p: number, c: number, g: number];
@@ -11,10 +12,10 @@ interface CompSeed { nome: string; ops: Op[] }
 interface RefSeed { nome: string; horario: string; comps: CompSeed[] }
 
 const CARBO_ALMOCO: Op[] = [
-  ['Arroz branco', '5 a 6 c. sopa (150-180g)', 210, 4, 46, 0.5],
-  ['Batata cozida', 'porção equivalente (~250g)', 215, 5, 50, 0],
-  ['Mandioca cozida', '~170g', 210, 1, 50, 0.5],
-  ['Macarrão', '~2 pegadores (140g)', 220, 7, 43, 1.5],
+  ['Arroz branco', '6 a 7 c. sopa (200g)', 260, 5, 56, 0.5],
+  ['Batata cozida', 'porção equivalente (~300g)', 260, 6, 60, 0.5],
+  ['Mandioca cozida', '~210g', 260, 1, 62, 0.5],
+  ['Macarrão', '~2,5 pegadores (170g)', 265, 8.5, 52.5, 1.5],
 ];
 
 const PROTEINA_ALMOCO: Op[] = [
@@ -76,7 +77,7 @@ const DADOS: RefSeed[] = [
         nome: 'Opção',
         ops: [
           ['Pão francês + frango desfiado', '2 pães + 100g de frango', 465, 40, 58, 6.5],
-          ['Arroz + frango', '150g de arroz + 120g de frango', 395, 41, 42, 4.5],
+          ['Arroz + frango', '200g de arroz + 120g de frango', 460, 43, 56, 4.5],
           ['Tapioca + ovos + fruta', '1 tapioca + 3 ovos + 1 fruta', 445, 20, 52.5, 16.5],
         ],
       },
@@ -110,9 +111,12 @@ const DADOS: RefSeed[] = [
 
 const ORIENTACOES: OrientacoesPlano = {
   estrategia:
-    'Superávit moderado (2.500 a 2.600 kcal/dia) para ganho de massa sem acelerar o acúmulo de gordura. ' +
+    'Superávit moderado (2.900 a 3.000 kcal/dia) para ganho de massa sem acelerar o acúmulo de gordura. ' +
     'Acompanhar o peso pela média de 3 a 4 pesagens semanais, sempre em condições semelhantes. ' +
-    'Se após 2 a 3 semanas o peso não apresentar tendência de alta, acrescentar 100 a 150 kcal/dia.',
+    'Se após 2 a 3 semanas o peso não apresentar tendência de alta, acrescentar 100 a 150 kcal/dia. ' +
+    'Ajuste de set/2026: carboidratos do almoço, jantar e do lanche da tarde aumentados (+100 kcal/dia). ' +
+    'A adesão de 13/08 a 31/08 mostrou média real de 2.528 kcal/dia, com a ceia faltando em 47% dos dias: ' +
+    'fechar as 6 refeições vale ~670 kcal/dia, muito mais do que qualquer aumento de porção.',
   basicos: [
     { categoria: 'Carboidratos', itens: 'Arroz, feijão, pão, aveia, macarrão, batata, mandioca, tapioca' },
     { categoria: 'Proteínas', itens: 'Ovos, frango, carne moída magra, patinho, leite, iogurte, whey protein' },
@@ -138,9 +142,9 @@ const ORIENTACOES: OrientacoesPlano = {
     'Em caso de alergias, intolerâncias ou condições clínicas, revisar com nutricionista.',
 };
 
-/** Metas diárias derivadas do plano (meta de 2.500 a 2.600 kcal). */
+/** Metas diárias derivadas do plano. Calibradas nos dias em que as 6 refeições foram fechadas (média real 2.885 kcal + 100 do ajuste). */
 export function metasGanhoDePeso(): MetasDieta {
-  return { id: 'metas-dieta', kcal: 2550, proteina: 180, carbo: 300, gordura: 70 };
+  return { id: 'metas-dieta', kcal: 2950, proteina: 195, carbo: 370, gordura: 75 };
 }
 
 /** Monta o DietaPlano com ids estáveis (g{i}, g{i}c{j}, g{i}c{j}o{k}). */

@@ -28,6 +28,19 @@ interface Ponto {
           stroke-linejoin="round"
           stroke-linecap="round"
         />
+        @for (seg of segmentosMedia(); track $index) {
+          <polyline
+            [attr.points]="seg"
+            fill="none"
+            stroke="var(--accent-2)"
+            stroke-width="2"
+            stroke-dasharray="4 3"
+            vector-effect="non-scaling-stroke"
+            stroke-linejoin="round"
+            stroke-linecap="round"
+            opacity="0.9"
+          />
+        }
         @for (p of pontos(); track $index; let ultimo = $last) {
           <circle
             [attr.cx]="p.cx"
@@ -72,6 +85,8 @@ interface Ponto {
 })
 export class LineChartComponent {
   readonly valores = input.required<number[]>();
+  /** Série secundária (ex.: média móvel), alinhada a `valores`. `null` = sem valor no ponto. */
+  readonly media = input<readonly (number | null)[] | null>(null);
 
   private readonly largura = 100;
   private readonly altura = 40;
@@ -105,4 +120,31 @@ export class LineChartComponent {
   protected readonly area = computed(
     () => `0,${this.altura} ${this.linha()} ${this.largura},${this.altura}`,
   );
+
+  /**
+   * Média móvel em segmentos: cada trecho contíguo de valores não nulos vira uma polyline.
+   * Evita ligar pontos separados por lacunas (dias sem valor no início da janela).
+   */
+  protected readonly segmentosMedia = computed<string[]>(() => {
+    const m = this.media();
+    const vals = this.valores();
+    if (!m || vals.length < 2) return [];
+    const max = this.maximo();
+    const min = this.minimo();
+    const span = max - min || 1;
+    const passo = this.largura / (vals.length - 1);
+    const segs: string[] = [];
+    let atual: string[] = [];
+    m.slice(0, vals.length).forEach((v, i) => {
+      if (v === null || v === undefined || !Number.isFinite(v)) {
+        if (atual.length >= 2) segs.push(atual.join(' '));
+        atual = [];
+        return;
+      }
+      const cy = this.altura - ((v - min) / span) * (this.altura - 4) - 2;
+      atual.push(`${i * passo},${cy}`);
+    });
+    if (atual.length >= 2) segs.push(atual.join(' '));
+    return segs;
+  });
 }
