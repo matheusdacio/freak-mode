@@ -55,9 +55,10 @@ function calcularStreak(sessoes: Sessao[]): number {
 export class ConquistasService {
   private readonly db = inject(DbService);
 
-  async computar(): Promise<{ conquistas: Conquista[]; streak: number; totalSessoes: number }> {
-    const todas = await this.db.getAll<Sessao>('sessoes');
-    const sessoes = todas.filter(s => s.status !== 'rascunho');
+  /** `concluidas` evita uma segunda leitura quando a tela já carregou as sessões. */
+  async computar(concluidas?: Sessao[]): Promise<{ conquistas: Conquista[]; streak: number; totalSessoes: number }> {
+    const sessoes =
+      concluidas ?? (await this.db.getAll<Sessao>('sessoes')).filter(s => s.status !== 'rascunho');
     const total = sessoes.length;
     const streak = calcularStreak(sessoes);
 

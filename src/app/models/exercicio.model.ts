@@ -9,4 +9,8 @@ export interface Exercicio {
   repsMin?: number;
   /** Faixa de repetições alvo — máximo (ex: 12 em "8–12"). */
   repsMax?: number;
+  /** Detalhe da execução que não cabe na faixa de reps (ex: "cada lado", série combinada). */
+  obs?: string;
+  /** Como a série é medida: repetições (padrão) ou minutos (ex: simulador de escada). */
+  unidade?: 'reps' | 'min';
 }

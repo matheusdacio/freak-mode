@@ -8,7 +8,9 @@ import {
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { TreinoService } from '@services/treino.service';
-import { Exercicio } from '@models/exercicio.model';
+import { SessaoService } from '@services/sessao.service';
+import { hojeLocal } from '../shared/datas';
+import { faixaTexto, unidade } from '../shared/exercicio-util';
 import { Treino } from '@models/treino.model';
 import { AuthService } from '@services/auth.service';
 import { Conquista, ConquistasService } from '@services/conquistas.service';
@@ -73,14 +75,24 @@ import {
     </div>
 
     @if (svc.carregado()) {
-      @if (svc.treinos().length === 0) {
+      @if (!svc.fichaImportada()) {
+        <section class="ficha anim-in">
+          <p class="ficha-kicker">FICHA NOVA DO PROFESSOR</p>
+          <p class="ficha-texto">Treino A a E. Os treinos atuais vão para Arquivados, com o histórico.</p>
+          <button class="btn btn-primary btn-block" [disabled]="importando()" (click)="importarFicha()">
+            Importar ficha nova
+          </button>
+        </section>
+      }
+
+      @if (svc.ativos().length === 0) {
         <div class="vazio anim-in">
           <span class="vazio-emoji">🏋️</span>
           <p class="muted">Nenhum treino ainda.<br />Crie o primeiro acima e entre no modo freak.</p>
         </div>
       } @else {
         <ul class="lista" cdkDropList (cdkDropListDropped)="drop($event)">
-          @for (t of svc.treinos(); track t.id) {
+          @for (t of svc.ativos(); track t.id) {
             <li
               class="card anim-in"
               cdkDrag
@@ -91,7 +103,7 @@ import {
                 <div class="capa-img" [style.background-image]="'url(' + t.capa + ')'"></div>
                 <div class="capa-overlay"></div>
               } @else {
-                <span class="marca">{{ t.nome.charAt(0) }}</span>
+                <span class="marca">{{ marca(t.nome) }}</span>
               }
               <div class="card-inner">
                 <button class="card-main" (click)="executar(t.id)">
@@ -99,7 +111,11 @@ import {
                   <span class="meta">
                     {{ t.exercicios.length }}
                     {{ t.exercicios.length === 1 ? 'exercício' : 'exercícios' }}
-                    <span class="iniciar">· INICIAR ▶</span>
+                    @if (feitosHoje().has(t.id)) {
+                      <span class="iniciar feito">· ✓ FEITO HOJE</span>
+                    } @else {
+                      <span class="iniciar">· INICIAR ▶</span>
+                    }
                   </span>
                 </button>
                 <div class="card-barra">
@@ -107,6 +123,7 @@ import {
                   <div class="acoes">
                     <button class="acao" title="Histórico" (click)="historico(t.id)">📈</button>
                     <button class="acao" title="Editar" (click)="editar(t.id)">✎</button>
+                    <button class="acao" title="Arquivar" (click)="arquivar(t)">🗄</button>
                     <button class="acao" title="Excluir" (click)="remover(t)">🗑</button>
                   </div>
                 </div>
@@ -114,6 +131,27 @@ import {
             </li>
           }
         </ul>
+      }
+
+      @if (svc.arquivados().length > 0) {
+        <section class="sec-arquivados anim-in">
+          <button class="arq-toggle" (click)="verArquivados.set(!verArquivados())">
+            <span class="sec-titulo">ARQUIVADOS</span>
+            <span class="sec-contagem muted">{{ svc.arquivados().length }} {{ verArquivados() ? '▾' : '▸' }}</span>
+          </button>
+          @if (verArquivados()) {
+            <ul class="arq-lista">
+              @for (t of svc.arquivados(); track t.id) {
+                <li class="arq-item">
+                  <span class="arq-nome">{{ t.nome }}</span>
+                  <button class="acao" title="Histórico" (click)="historico(t.id)">📈</button>
+                  <button class="acao" title="Voltar para a lista" (click)="desarquivar(t)">↩</button>
+                  <button class="acao" title="Excluir" (click)="remover(t)">🗑</button>
+                </li>
+              }
+            </ul>
+          }
+        </section>
       }
 
       @if (conquistas().length > 0) {
@@ -135,7 +173,7 @@ import {
         </section>
       }
 
-      @if (svc.treinos().length > 0) {
+      @if (svc.ativos().length > 0) {
         <button class="exportar" (click)="exportar()" title="Exportar treinos (.xlsx)">⬇ exportar</button>
       }
     } @else {
@@ -282,6 +320,70 @@ import {
         color: var(--accent-2);
       }
 
+      /* ---- Ficha nova ---- */
+      .ficha {
+        border: 1px solid var(--accent-dim);
+        border-radius: var(--radius);
+        background: linear-gradient(150deg, var(--surface) 0%, var(--accent-soft) 140%);
+        padding: 1rem 1.1rem 1.1rem;
+        margin-bottom: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+      .ficha-kicker {
+        font-size: 0.66rem;
+        letter-spacing: 0.3em;
+        color: var(--accent);
+        font-weight: 700;
+      }
+      .ficha-texto {
+        font-size: 0.85rem;
+        color: var(--muted);
+        line-height: 1.4;
+        margin-bottom: 0.3rem;
+      }
+
+      /* ---- Arquivados ---- */
+      .sec-arquivados {
+        margin-bottom: 1.5rem;
+      }
+      .arq-toggle {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.4rem 0;
+      }
+      .arq-lista {
+        list-style: none;
+        margin-top: 0.6rem;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-sm);
+        overflow: hidden;
+      }
+      .arq-item {
+        display: flex;
+        align-items: stretch;
+        background: var(--surface);
+      }
+      .arq-item + .arq-item {
+        border-top: 1px solid var(--line);
+      }
+      .arq-nome {
+        flex: 1;
+        min-width: 0;
+        padding: 0.7rem 0.9rem;
+        font-size: 0.85rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--muted);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
       .lista {
         list-style: none;
         display: flex;
@@ -370,6 +472,9 @@ import {
         font-weight: 700;
         letter-spacing: 0.06em;
         font-size: 0.72rem;
+      }
+      .iniciar.feito {
+        color: var(--ok);
       }
       .card-barra {
         display: flex;
@@ -489,12 +594,17 @@ import {
 export class TreinosComponent implements OnInit {
   protected readonly svc = inject(TreinoService);
   private readonly conquistasSvc = inject(ConquistasService);
+  private readonly sessaoSvc = inject(SessaoService);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
 
   protected readonly conquistas = signal<Conquista[]>([]);
   protected readonly streak = signal(0);
   protected readonly totalSessoes = signal(0);
+  protected readonly verArquivados = signal(false);
+  protected readonly importando = signal(false);
+  /** Treinos com sessão concluída hoje: o card mostra "feito" e a execução oferece continuar. */
+  protected readonly feitosHoje = signal<Set<string>>(new Set());
 
   protected readonly nome = new FormControl('', {
     nonNullable: true,
@@ -504,7 +614,10 @@ export class TreinosComponent implements OnInit {
   async ngOnInit(): Promise<void> {
     await this.svc.carregar();
     try {
-      const resultado = await this.conquistasSvc.computar();
+      const sessoes = await this.sessaoSvc.concluidas();
+      const hoje = hojeLocal();
+      this.feitosHoje.set(new Set(sessoes.filter((s) => s.data === hoje).map((s) => s.treinoId)));
+      const resultado = await this.conquistasSvc.computar(sessoes);
       this.conquistas.set(resultado.conquistas);
       this.streak.set(resultado.streak);
       this.totalSessoes.set(resultado.totalSessoes);
@@ -518,7 +631,7 @@ export class TreinosComponent implements OnInit {
   }
 
   protected drop(event: CdkDragDrop<Treino[]>): void {
-    const lista = [...this.svc.treinos()];
+    const lista = [...this.svc.ativos()];
     moveItemInArray(lista, event.previousIndex, event.currentIndex);
     this.svc.reordenar(lista);
   }
@@ -542,6 +655,33 @@ export class TreinosComponent implements OnInit {
     this.router.navigate(['/treino', id, 'historico']);
   }
 
+  /** Letra de fundo do card: "A · PEITO E COSTAS" vira "A" (e "Treino X", de nome manual, vira "X"). */
+  protected marca(nome: string): string {
+    return nome.replace(/^treino\s+/i, '').charAt(0);
+  }
+
+  protected async importarFicha(): Promise<void> {
+    const atuais = this.svc.ativos().length;
+    const aviso = atuais > 0
+      ? `Importar Treino A a E e arquivar os ${atuais} treinos atuais? O histórico deles continua em Arquivados.`
+      : 'Importar Treino A a E?';
+    if (!confirm(aviso)) return;
+    this.importando.set(true);
+    try {
+      await this.svc.importarFichaProfessor();
+    } finally {
+      this.importando.set(false);
+    }
+  }
+
+  protected async arquivar(t: Treino): Promise<void> {
+    await this.svc.arquivar(t, true);
+  }
+
+  protected async desarquivar(t: Treino): Promise<void> {
+    await this.svc.arquivar(t, false);
+  }
+
   protected async remover(t: { id: string; nome: string }): Promise<void> {
     if (confirm(`Excluir o treino "${t.nome}"? As sessões salvas continuam no histórico.`)) {
       await this.svc.remover(t.id);
@@ -556,9 +696,9 @@ export class TreinosComponent implements OnInit {
   protected async exportar(): Promise<void> {
     const XLSX = await import('xlsx');
     const linhas: Record<string, string | number>[] = [];
-    for (const t of this.svc.treinos()) {
+    for (const t of this.svc.ativos()) {
       if (t.exercicios.length === 0) {
-        linhas.push({ Treino: t.nome, Exercício: '', Séries: '', Reps: '' });
+        linhas.push({ Treino: t.nome, Exercício: '', Séries: '', Reps: '', Obs: '' });
         continue;
       }
       for (const ex of t.exercicios) {
@@ -566,23 +706,15 @@ export class TreinosComponent implements OnInit {
           Treino: t.nome,
           Exercício: ex.nome,
           Séries: ex.series,
-          Reps: this.faixaTexto(ex),
+          Reps: faixaTexto(ex) + (unidade(ex) === 'min' ? ' min' : ''),
+          Obs: ex.obs ?? '',
         });
       }
     }
     const ws = XLSX.utils.json_to_sheet(linhas);
-    ws['!cols'] = [{ wch: 18 }, { wch: 28 }, { wch: 8 }, { wch: 10 }];
+    ws['!cols'] = [{ wch: 18 }, { wch: 28 }, { wch: 8 }, { wch: 10 }, { wch: 40 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Treinos');
     XLSX.writeFile(wb, 'freakmode-treinos.xlsx');
-  }
-
-  private faixaTexto(ex: Exercicio): string {
-    const min = ex.repsMin ?? ex.reps;
-    const max = ex.repsMax ?? ex.reps;
-    if (min && max) return min === max ? `${min}` : `${min}-${max}`;
-    if (min) return `${min}+`;
-    if (max) return `até ${max}`;
-    return '';
   }
 }

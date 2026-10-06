@@ -44,6 +44,17 @@ import { TreinoService } from '@services/treino.service';
       </section>
 
       <section class="bloco anim-in">
+        <h2>ORIENTAÇÃO</h2>
+        <textarea
+          class="field obs-treino"
+          rows="2"
+          [value]="t.obs ?? ''"
+          (input)="setObsTreino($event)"
+          placeholder="Ex: descanso entre séries, observações do professor…"
+        ></textarea>
+      </section>
+
+      <section class="bloco anim-in">
         <h2>EXERCÍCIOS <span class="contagem">{{ t.exercicios.length }}</span></h2>
 
         @if (t.exercicios.length === 0) {
@@ -90,9 +101,22 @@ import { TreinoService } from '@services/treino.service';
                         [value]="ex.repsMax ?? ex.reps ?? ''"
                         (input)="setReps(i, 'max', $event)"
                       />
-                      <small>reps</small>
+                      <button
+                        class="unidade"
+                        title="Alternar entre repetições e minutos"
+                        (click)="alternarUnidade(i)"
+                      >
+                        {{ ex.unidade === 'min' ? 'min' : 'reps' }}
+                      </button>
                     </div>
                   </div>
+                  <input
+                    class="ex-obs"
+                    type="text"
+                    [value]="ex.obs ?? ''"
+                    (input)="setObs(i, $event)"
+                    placeholder="Observação (ex: cada lado)"
+                  />
                 </div>
               </li>
             }
@@ -301,6 +325,27 @@ import { TreinoService } from '@services/treino.service';
         font-weight: 600;
         outline: none;
       }
+      .ex-obs {
+        width: 100%;
+        margin-top: 0.55rem;
+        background: transparent;
+        border: none;
+        border-top: 1px dashed var(--line);
+        padding-top: 0.5rem;
+        font-size: 0.8rem;
+        color: var(--muted);
+        outline: none;
+      }
+      .ex-obs:focus {
+        color: var(--text);
+      }
+      .obs-treino {
+        width: 100%;
+        resize: vertical;
+        font: inherit;
+        font-size: 0.85rem;
+        line-height: 1.4;
+      }
       .remover {
         font-size: 0.95rem;
         opacity: 0.6;
@@ -344,13 +389,19 @@ import { TreinoService } from '@services/treino.service';
         color: var(--muted);
         font-weight: 700;
       }
-      .faixa-reps small {
+      /* Unidade da faixa: toque alterna reps <-> min (exercício por tempo). */
+      .unidade {
         font-size: 0.56rem;
         color: var(--muted);
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.06em;
         margin-left: 0.1rem;
+        padding: 0.1rem 0.15rem;
+        border-bottom: 1px dashed var(--line-strong);
+      }
+      .unidade:active {
+        color: var(--accent-2);
       }
       .contador {
         display: flex;
@@ -488,6 +539,26 @@ export class TreinoEditorComponent implements OnInit {
       }
       if (campo === 'min') ex.repsMin = valor;
       else ex.repsMax = valor;
+    });
+  }
+
+  protected setObs(index: number, event: Event): void {
+    const valor = (event.target as HTMLInputElement).value;
+    this.patch((t) => {
+      const ex = t.exercicios[index];
+      if (ex) ex.obs = valor.trim() ? valor : undefined;
+    });
+  }
+
+  protected setObsTreino(event: Event): void {
+    const valor = (event.target as HTMLTextAreaElement).value;
+    this.patch((t) => (t.obs = valor.trim() ? valor : undefined));
+  }
+
+  protected alternarUnidade(index: number): void {
+    this.patch((t) => {
+      const ex = t.exercicios[index];
+      if (ex) ex.unidade = ex.unidade === 'min' ? undefined : 'min';
     });
   }
 
