@@ -11,17 +11,24 @@ import { SessaoService } from '@services/sessao.service';
 import { TreinoService } from '@services/treino.service';
 import { Treino } from '@models/treino.model';
 
+/** Sessão concluída num dia, com o que o detalhe precisa para abrir a correção. */
+interface SessaoDia {
+  id: string;
+  treinoId: string;
+  nome: string;
+}
+
 interface Celula {
   dia: number | null;
   dateStr: string;
-  treinos: string[];
+  sessoes: SessaoDia[];
   hoje: boolean;
 }
 
 interface DetalheSel {
   label: string;
   dateStr: string;
-  treinos: string[];
+  sessoes: SessaoDia[];
   passado: boolean;
 }
 
@@ -64,13 +71,13 @@ const MESES = [
           } @else {
             <button
               class="cel"
-              [class.treinou]="c.treinos.length > 0"
+              [class.treinou]="c.sessoes.length > 0"
               [class.hoje]="c.hoje"
               [class.sel]="selecionado() === c.dateStr"
               (click)="selecionar(c.dateStr)"
             >
               <span class="num">{{ c.dia }}</span>
-              @if (c.treinos.length > 0) { <span class="ponto"></span> }
+              @if (c.sessoes.length > 0) { <span class="ponto"></span> }
             </button>
           }
         }
@@ -80,15 +87,19 @@ const MESES = [
     @if (detalheSel(); as d) {
       <section class="detalhe anim-in">
         <h2>{{ d.label }}</h2>
-        @if (d.treinos.length > 0) {
-          @for (t of d.treinos; track $index) {
-            <div class="treino-dia"><span class="tag">🏋️</span> {{ t }}</div>
+        @if (d.sessoes.length > 0) {
+          @for (s of d.sessoes; track s.id) {
+            <a class="treino-dia" [routerLink]="['/treino', s.treinoId, 'sessao', s.id]">
+              <span class="tag">🏋️</span>
+              <span class="treino-nome">{{ s.nome }}</span>
+              <span class="corrigir muted">corrigir ✎</span>
+            </a>
           }
         } @else {
           <p class="muted">Nenhum treino registrado neste dia.</p>
         }
 
-        @if (d.passado && d.treinos.length === 0) {
+        @if (d.passado && d.sessoes.length === 0) {
           <div class="retro-bloco">
             <p class="retro-label">Você treinou neste dia?</p>
             <div class="retro-lista">
@@ -130,7 +141,11 @@ const MESES = [
 
       .detalhe { margin-top: 1.1rem; background: linear-gradient(160deg, var(--surface) 0%, var(--surface-2) 140%); border: 1px solid var(--line); border-radius: var(--radius); padding: 0.9rem 1rem; }
       .detalhe h2 { font-family: var(--font-display); font-size: 1.2rem; text-transform: uppercase; margin-bottom: 0.5rem; }
-      .treino-dia { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0; font-weight: 600; }
+      .treino-dia { display: flex; align-items: center; gap: 0.5rem; padding: 0.45rem 0; font-weight: 600; color: var(--text); text-decoration: none; }
+      .treino-dia + .treino-dia { border-top: 1px solid var(--line); }
+      .treino-dia:active .treino-nome { color: var(--accent-2); }
+      .treino-nome { flex: 1; }
+      .corrigir { font-size: 0.72rem; font-weight: 600; }
       .tag { font-size: 1rem; }
       .retro-bloco { margin-top: 0.8rem; padding-top: 0.8rem; border-top: 1px solid var(--line); }
       .retro-label { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 0.5rem; }
@@ -144,7 +159,7 @@ export class CalendarioComponent implements OnInit {
   private readonly sessaoSvc = inject(SessaoService);
   private readonly treinoSvc = inject(TreinoService);
 
-  private readonly porData = signal<Map<string, string[]>>(new Map());
+  private readonly porData = signal<Map<string, SessaoDia[]>>(new Map());
   protected readonly diasSemana = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
 
   private readonly hoje = new Date();
@@ -163,11 +178,11 @@ export class CalendarioComponent implements OnInit {
     const dias = new Date(y, m + 1, 0).getDate();
     const cels: Celula[] = [];
     for (let i = 0; i < inicio; i++) {
-      cels.push({ dia: null, dateStr: '', treinos: [], hoje: false });
+      cels.push({ dia: null, dateStr: '', sessoes: [], hoje: false });
     }
     for (let d = 1; d <= dias; d++) {
       const ds = this.dataStr(y, m, d);
-      cels.push({ dia: d, dateStr: ds, treinos: mapa.get(ds) ?? [], hoje: ds === hojeStr });
+      cels.push({ dia: d, dateStr: ds, sessoes: mapa.get(ds) ?? [], hoje: ds === hojeStr });
     }
     return cels;
   });
@@ -175,13 +190,13 @@ export class CalendarioComponent implements OnInit {
   protected readonly totalNoMes = computed(() => {
     const prefixo = `${this.ano()}-${String(this.mes() + 1).padStart(2, '0')}`;
     let total = 0;
-    for (const [data, treinos] of this.porData()) {
-      if (data.startsWith(prefixo)) total += treinos.length;
+    for (const [data, sessoes] of this.porData()) {
+      if (data.startsWith(prefixo)) total += sessoes.length;
     }
     return total;
   });
 
-  protected readonly treinos = computed(() => this.treinoSvc.treinos());
+  protected readonly treinos = computed(() => this.treinoSvc.ativos());
   protected readonly salvando = signal(false);
 
   protected readonly detalheSel = computed<DetalheSel | null>(() => {
@@ -192,7 +207,7 @@ export class CalendarioComponent implements OnInit {
     return {
       label: `${d}/${m}/${y}`,
       dateStr: sel,
-      treinos: this.porData().get(sel) ?? [],
+      sessoes: this.porData().get(sel) ?? [],
       passado: sel < hojeStr,
     };
   });
@@ -201,12 +216,11 @@ export class CalendarioComponent implements OnInit {
     if (!this.treinoSvc.carregado()) await this.treinoSvc.carregar();
     const nomePorId = new Map(this.treinoSvc.treinos().map((t) => [t.id, t.nome]));
     const sessoes = await this.sessaoSvc.concluidas();
-    const mapa = new Map<string, string[]>();
+    const mapa = new Map<string, SessaoDia[]>();
     for (const s of sessoes) {
       if (!s.data) continue;
-      const nome = nomePorId.get(s.treinoId) ?? 'Treino';
       const lista = mapa.get(s.data) ?? [];
-      lista.push(nome);
+      lista.push({ id: s.id, treinoId: s.treinoId, nome: nomePorId.get(s.treinoId) ?? 'Treino' });
       mapa.set(s.data, lista);
     }
     this.porData.set(mapa);
@@ -214,11 +228,10 @@ export class CalendarioComponent implements OnInit {
 
   async registrarRetroativo(treino: Treino, data: string): Promise<void> {
     this.salvando.set(true);
-    await this.sessaoSvc.criarRetroativo(treino, data);
+    const sessao = await this.sessaoSvc.criarRetroativo(treino, data);
     const mapa = new Map(this.porData());
-    const nomePorId = new Map(this.treinoSvc.treinos().map((t) => [t.id, t.nome]));
-    const lista = mapa.get(data) ?? [];
-    lista.push(nomePorId.get(treino.id) ?? treino.nome);
+    const lista = [...(mapa.get(data) ?? [])];
+    lista.push({ id: sessao.id, treinoId: treino.id, nome: treino.nome });
     mapa.set(data, lista);
     this.porData.set(mapa);
     this.salvando.set(false);

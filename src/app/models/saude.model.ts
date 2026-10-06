@@ -19,3 +19,13 @@ export interface DiaAgua {
   data: string;
   ml: number;
 }
+
+export type ObjetivoPeso = 'ganhar' | 'perder' | 'manter';
+
+/** Objetivo de peso do usuário. id = 'meta-peso' (um só). Define a cor das variações. */
+export interface MetaPeso {
+  readonly id: string;
+  objetivo: ObjetivoPeso;
+  /** Peso alvo em kg, opcional. Vira linha no gráfico e "faltam X kg". */
+  alvo?: number;
+}

@@ -52,6 +52,12 @@ export const routes: Routes = [
       import('./pages/execucao.component').then(m => m.ExecucaoComponent),
   },
   {
+    path: 'treino/:id/sessao/:sessaoId',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./pages/execucao.component').then(m => m.ExecucaoComponent),
+  },
+  {
     path: 'treino/:id/historico',
     canActivate: [authGuard],
     loadComponent: () =>

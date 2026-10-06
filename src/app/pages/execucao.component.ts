@@ -7,11 +7,23 @@ import {
   OnInit,
   signal,
 } from '@angular/core';
+import { Location } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
-import { Sessao } from '@models/sessao.model';
+import { Exercicio } from '@models/exercicio.model';
+import { RegistroSerie, Sessao } from '@models/sessao.model';
 import { Treino } from '@models/treino.model';
 import { SessaoService } from '@services/sessao.service';
 import { TreinoService } from '@services/treino.service';
+import { hojeLocal, labelRelativa } from '../shared/datas';
+import { faixaLabel, serieFeita, unidade } from '../shared/exercicio-util';
+
+/** Sessão já concluída hoje, oferecida para continuar em vez de abrir a próxima. */
+interface SessaoDeHoje {
+  id: string;
+  ordem: number;
+  feitas: number;
+  total: number;
+}
 
 @Component({
   selector: 'app-execucao',
@@ -20,13 +32,16 @@ import { TreinoService } from '@services/treino.service';
     @if (treino(); as t) {
       <header class="topo anim-in">
         <div class="topo-nav">
-          <button class="voltar" (click)="voltar()">← Treinos</button>
+          <button class="voltar" (click)="voltar()">{{ editando() ? '← Voltar' : '← Treinos' }}</button>
           <button class="btn-modo" (click)="minimalista.set(!minimalista())">
             {{ minimalista() ? '⊞ Detalhes' : '⊟ Simples' }}
           </button>
         </div>
-        <p class="kicker">EXECUTANDO · {{ ordemLabel() }}</p>
+        <p class="kicker">{{ kicker() }}</p>
         <h1>{{ t.nome }}</h1>
+        @if (t.obs) {
+          <p class="treino-obs">{{ t.obs }}</p>
+        }
 
         @if (progresso().total > 0) {
           <div class="progresso">
@@ -68,18 +83,20 @@ import { TreinoService } from '@services/treino.service';
                 <span class="ex-alvo">{{ faixa }}</span>
               }
             </div>
+            @if (obsExercicio(item.exercicioId); as obs) {
+              <p class="ex-obs">{{ obs }}</p>
+            }
             @if (!minimalista()) {
               <div class="grade-cabecalho">
-                <span>Série</span><span>Peso (kg)</span><span>Reps</span>
+                <span>Série</span>
+                <span>{{ porTempo(item.exercicioId) ? 'Nível' : 'Peso (kg)' }}</span>
+                <span>{{ porTempo(item.exercicioId) ? 'Minutos' : 'Reps' }}</span>
               </div>
             }
             @for (serie of item.series; track $index; let si = $index) {
               <div class="grade">
-                <span
-                  class="serie-num"
-                  [class.feita]="serie.peso !== null && serie.reps !== null"
-                >
-                  @if (serie.peso !== null && serie.reps !== null) {✓} @else {{{ si + 1 }}}
+                <span class="serie-num" [class.feita]="feita(item.exercicioId, serie)">
+                  @if (feita(item.exercicioId, serie)) {✓} @else {{{ si + 1 }}}
                 </span>
                 <input
                   class="cell"
@@ -116,10 +133,31 @@ import { TreinoService } from '@services/treino.service';
           @if (autoSalvo()) {
             <p class="indicador-salvo">✓ Progresso salvo</p>
           }
-          <button class="btn btn-primary btn-block" (click)="concluir()">
-            Concluir treino →
-          </button>
+          @if (editando()) {
+            <button class="btn btn-primary btn-block" (click)="salvarEdicao()">
+              Salvar alterações
+            </button>
+            <button class="btn-excluir" (click)="excluirSessao()">Excluir esta sessão</button>
+          } @else {
+            <button class="btn btn-primary btn-block" (click)="concluir()">
+              Concluir treino →
+            </button>
+          }
         </div>
+      } @else if (sessaoDeHoje(); as h) {
+        <section class="hoje anim-in">
+          <p class="hoje-titulo">Você já concluiu este treino hoje</p>
+          <p class="hoje-desc">
+            Sessão nº {{ h.ordem }}, com {{ h.feitas }} de {{ h.total }} séries preenchidas.
+            Dá para continuar nela em vez de abrir outra.
+          </p>
+          <button class="btn btn-primary btn-block" (click)="continuarHoje(h.id)">
+            Continuar a sessão de hoje
+          </button>
+          <button class="btn btn-ghost btn-block" (click)="comecarNova()">
+            Começar uma nova sessão
+          </button>
+        </section>
       }
     } @else {
       <p class="muted carregando">Carregando…</p>
@@ -230,6 +268,28 @@ import { TreinoService } from '@services/treino.service';
         padding: 2rem;
       }
 
+      /* ---- Já concluiu hoje ---- */
+      .hoje {
+        background: linear-gradient(160deg, var(--surface) 0%, var(--surface-2) 140%);
+        border: 1px solid var(--accent-dim);
+        border-radius: var(--radius);
+        padding: 1.1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+      }
+      .hoje-titulo {
+        font-family: var(--font-display);
+        font-size: 1.3rem;
+        text-transform: uppercase;
+      }
+      .hoje-desc {
+        font-size: 0.85rem;
+        color: var(--muted);
+        line-height: 1.45;
+        margin-bottom: 0.3rem;
+      }
+
       .ex {
         background: linear-gradient(160deg, var(--surface) 0%, var(--surface-2) 140%);
         border: 1px solid var(--line);
@@ -248,6 +308,18 @@ import { TreinoService } from '@services/treino.service';
       }
       .ex--min .ex-cabecalho {
         margin-bottom: 0.5rem;
+      }
+      .treino-obs {
+        margin-top: 0.6rem;
+        font-size: 0.78rem;
+        line-height: 1.45;
+        color: var(--muted);
+      }
+      .ex-obs {
+        margin: -0.35rem 0 0.75rem;
+        font-size: 0.78rem;
+        line-height: 1.4;
+        color: var(--accent-2);
       }
       .ex-alvo {
         margin-left: auto;
@@ -364,6 +436,21 @@ import { TreinoService } from '@services/treino.service';
         margin-bottom: 0.6rem;
         animation: aparecer 0.2s ease;
       }
+      .btn-excluir {
+        display: block;
+        width: 100%;
+        margin-top: 0.5rem;
+        padding: 0.55rem;
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--danger);
+        opacity: 0.75;
+      }
+      .btn-excluir:active {
+        opacity: 1;
+      }
       @keyframes aparecer {
         from { opacity: 0; transform: translateY(4px); }
         to   { opacity: 1; transform: translateY(0); }
@@ -376,26 +463,32 @@ export class ExecucaoComponent implements OnInit, OnDestroy {
   private readonly sessaoSvc = inject(SessaoService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly location = inject(Location);
 
   protected readonly treino = signal<Treino | undefined>(undefined);
   protected readonly sessao = signal<Sessao | undefined>(undefined);
   protected readonly minimalista = signal(false);
   protected readonly retomando = signal(false);
   protected readonly autoSalvo = signal(false);
+  /** Corrigindo uma sessão já concluída (aberta pelo histórico, calendário ou "continuar a de hoje"). */
+  protected readonly editando = signal(false);
+  protected readonly sessaoDeHoje = signal<SessaoDeHoje | null>(null);
+
+  private readonly exPorId = computed(
+    () => new Map((this.treino()?.exercicios ?? []).map((e): [string, Exercicio] => [e.id, e])),
+  );
+
+  protected readonly kicker = computed(() => {
+    const s = this.sessao();
+    const ordem = s?.ordem ?? 1;
+    if (!this.editando()) return `EXECUTANDO · SESSÃO Nº ${ordem}`;
+    const quando = s?.data ? ` · ${labelRelativa(s.data).toUpperCase()}` : '';
+    return `EDITANDO · SESSÃO Nº ${ordem}${quando}`;
+  });
 
   protected readonly progresso = computed(() => {
     const s = this.sessao();
-    let feitas = 0;
-    let total = 0;
-    if (s) {
-      for (const item of s.itens) {
-        for (const serie of item.series) {
-          total++;
-          if (serie.peso !== null && serie.reps !== null) feitas++;
-        }
-      }
-    }
-    return { feitas, total, pct: total ? Math.round((feitas / total) * 100) : 0 };
+    return s ? this.contar(s) : { feitas: 0, total: 0, pct: 0 };
   });
 
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -403,18 +496,39 @@ export class ExecucaoComponent implements OnInit, OnDestroy {
 
   async ngOnInit(): Promise<void> {
     const id = this.route.snapshot.paramMap.get('id');
+    const sessaoId = this.route.snapshot.paramMap.get('sessaoId');
     if (!id) return;
     const t = await this.treinoSvc.obter(id);
     this.treino.set(t);
-    if (t) {
-      const rascunho = await this.sessaoSvc.buscarRascunho(t.id);
-      if (rascunho) {
-        this.sessao.set(rascunho);
-        this.retomando.set(true);
-      } else {
-        this.sessao.set(await this.sessaoSvc.novaSessao(t));
+    if (!t) return;
+
+    if (sessaoId) {
+      const s = await this.sessaoSvc.obter(sessaoId);
+      if (!s || s.treinoId !== t.id) {
+        this.router.navigate(['/treino', t.id, 'historico'], { replaceUrl: true });
+        return;
       }
+      this.editando.set(s.status !== 'rascunho');
+      this.sessao.set(s);
+      return;
     }
+
+    const rascunho = await this.sessaoSvc.buscarRascunho(t.id);
+    if (rascunho) {
+      this.sessao.set(rascunho);
+      this.retomando.set(true);
+      return;
+    }
+
+    // Concluiu hoje e voltou: oferece continuar na mesma em vez de abrir a sessão seguinte.
+    const ultima = await this.sessaoSvc.ultima(t.id);
+    if (ultima && ultima.data === hojeLocal()) {
+      const { feitas, total } = this.contar(ultima);
+      this.sessaoDeHoje.set({ id: ultima.id, ordem: ultima.ordem, feitas, total });
+      return;
+    }
+
+    this.sessao.set(await this.sessaoSvc.novaSessao(t));
   }
 
   ngOnDestroy(): void {
@@ -422,20 +536,46 @@ export class ExecucaoComponent implements OnInit, OnDestroy {
     if (this.hideTimer) clearTimeout(this.hideTimer);
   }
 
-  protected ordemLabel(): string {
-    const ordem = this.sessao()?.ordem ?? 1;
-    return `SESSÃO Nº ${ordem}`;
+  private contar(s: Sessao): { feitas: number; total: number; pct: number } {
+    let feitas = 0;
+    let total = 0;
+    for (const item of s.itens) {
+      const ex = this.exPorId().get(item.exercicioId);
+      for (const serie of item.series) {
+        total++;
+        if (serieFeita(serie, ex)) feitas++;
+      }
+    }
+    return { feitas, total, pct: total ? Math.round((feitas / total) * 100) : 0 };
+  }
+
+  protected feita(exercicioId: string, serie: RegistroSerie): boolean {
+    return serieFeita(serie, this.exPorId().get(exercicioId));
+  }
+
+  protected porTempo(exercicioId: string): boolean {
+    return unidade(this.exPorId().get(exercicioId)) === 'min';
   }
 
   protected faixaReps(exercicioId: string): string {
-    const ex = this.treino()?.exercicios.find((e) => e.id === exercicioId);
-    if (!ex) return '';
-    const min = ex.repsMin ?? ex.reps;
-    const max = ex.repsMax ?? ex.reps;
-    if (min && max) return min === max ? `${min} reps` : `${min}–${max} reps`;
-    if (min) return `${min}+ reps`;
-    if (max) return `até ${max} reps`;
-    return '';
+    const ex = this.exPorId().get(exercicioId);
+    return ex ? faixaLabel(ex) : '';
+  }
+
+  protected obsExercicio(exercicioId: string): string {
+    return this.exPorId().get(exercicioId)?.obs ?? '';
+  }
+
+  protected continuarHoje(sessaoId: string): void {
+    const t = this.treino();
+    if (t) this.router.navigate(['/treino', t.id, 'sessao', sessaoId], { replaceUrl: true });
+  }
+
+  protected async comecarNova(): Promise<void> {
+    const t = this.treino();
+    if (!t) return;
+    this.sessaoDeHoje.set(null);
+    this.sessao.set(await this.sessaoSvc.novaSessao(t));
   }
 
   protected async descartar(): Promise<void> {
@@ -461,12 +601,22 @@ export class ExecucaoComponent implements OnInit, OnDestroy {
   private scheduleSave(sessao: Sessao): void {
     if (this.saveTimer) clearTimeout(this.saveTimer);
     this.saveTimer = setTimeout(() => {
+      this.saveTimer = null;
       this.sessaoSvc.salvar(sessao).then(() => {
         if (this.hideTimer) clearTimeout(this.hideTimer);
         this.autoSalvo.set(true);
         this.hideTimer = setTimeout(() => this.autoSalvo.set(false), 2000);
       });
     }, 1500);
+  }
+
+  /** Grava agora o que ainda estava na fila do autosave, para sair da tela sem perder a última digitação. */
+  private async flush(): Promise<void> {
+    if (!this.saveTimer) return;
+    clearTimeout(this.saveTimer);
+    this.saveTimer = null;
+    const s = this.sessao();
+    if (s) await this.sessaoSvc.salvar(s);
   }
 
   private numero(event: Event): number | null {
@@ -502,6 +652,7 @@ export class ExecucaoComponent implements OnInit, OnDestroy {
 
   protected async concluir(): Promise<void> {
     if (this.saveTimer) clearTimeout(this.saveTimer);
+    this.saveTimer = null;
     const s = this.sessao();
     if (!s) return;
     const concluida: Sessao = { ...s, status: 'concluida' };
@@ -509,7 +660,29 @@ export class ExecucaoComponent implements OnInit, OnDestroy {
     this.router.navigate(['/treino', s.treinoId, 'historico']);
   }
 
-  protected voltar(): void {
-    this.router.navigate(['/']);
+  protected async salvarEdicao(): Promise<void> {
+    if (this.saveTimer) clearTimeout(this.saveTimer);
+    this.saveTimer = null;
+    const s = this.sessao();
+    if (!s) return;
+    await this.sessaoSvc.salvar(s);
+    this.location.back();
+  }
+
+  protected async excluirSessao(): Promise<void> {
+    const s = this.sessao();
+    if (!s) return;
+    const quando = s.data ? ` de ${labelRelativa(s.data)}` : '';
+    if (!confirm(`Excluir a sessão nº ${s.ordem}${quando}? Isso não pode ser desfeito.`)) return;
+    if (this.saveTimer) clearTimeout(this.saveTimer);
+    this.saveTimer = null;
+    await this.sessaoSvc.remover(s.id);
+    this.location.back();
+  }
+
+  protected async voltar(): Promise<void> {
+    await this.flush();
+    if (this.editando()) this.location.back();
+    else this.router.navigate(['/']);
   }
 }

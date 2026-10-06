@@ -1,11 +1,12 @@
 import { inject, Injectable } from '@angular/core';
 import { DbService } from '@services/db.service';
-import { DiaAgua, RegistroMedidas, RegistroPeso } from '@models/saude.model';
+import { DiaAgua, MetaPeso, RegistroMedidas, RegistroPeso } from '@models/saude.model';
 
 /** Medidas corporais acompanhadas (cm). */
 export const NOMES_MEDIDAS = ['Braço', 'Peito', 'Cintura', 'Quadril', 'Coxa', 'Panturrilha'];
 
 const META_AGUA_ID = 'meta-agua';
+const META_PESO_ID = 'meta-peso';
 const META_AGUA_PADRAO = 3000; // ml
 
 @Injectable({ providedIn: 'root' })
@@ -25,6 +26,19 @@ export class SaudeService {
 
   async salvarPeso(peso: number, data = this.hoje()): Promise<void> {
     await this.db.put('pesos', { id: data, data, peso });
+  }
+
+  async removerPeso(data: string): Promise<void> {
+    await this.db.delete('pesos', data);
+  }
+
+  async obterMetaPeso(): Promise<MetaPeso> {
+    const m = await this.db.get<MetaPeso>('config', META_PESO_ID);
+    return m ?? { id: META_PESO_ID, objetivo: 'ganhar' };
+  }
+
+  async salvarMetaPeso(meta: MetaPeso): Promise<void> {
+    await this.db.put('config', { ...meta, id: META_PESO_ID });
   }
 
   // ---- Medidas ----

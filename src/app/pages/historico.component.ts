@@ -7,11 +7,14 @@ import {
   signal,
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
+import { Exercicio } from '@models/exercicio.model';
 import { Sessao } from '@models/sessao.model';
 import { Treino } from '@models/treino.model';
 import { SessaoService } from '@services/sessao.service';
 import { TreinoService } from '@services/treino.service';
 import { LineChartComponent } from '../shared/line-chart.component';
+import { labelRelativa } from '../shared/datas';
+import { serieFeita } from '../shared/exercicio-util';
 
 type Metrica = 'carga' | 'volume';
 
@@ -19,6 +22,9 @@ interface ProgressaoExercicio {
   nome: string;
   valores: number[];
 }
+
+/** Sessões mostradas na lista antes de "ver todas". */
+const LIMITE_SESSOES = 5;
 
 @Component({
   selector: 'app-historico',
@@ -45,6 +51,30 @@ interface ProgressaoExercicio {
           </button>
         </div>
       } @else {
+        <section class="sessoes anim-in">
+          <div class="sec-topo">
+            <h2 class="sec-titulo">SESSÕES</h2>
+            <span class="sec-sub muted">toque para corrigir</span>
+          </div>
+          <ul class="sessao-lista">
+            @for (s of sessoesVisiveis(); track s.id) {
+              <li>
+                <button class="sessao-item" (click)="editarSessao(s.id)">
+                  <span class="sessao-ordem">Nº {{ s.ordem }}</span>
+                  <span class="sessao-data">{{ s.data ? labelData(s.data) : 'sem data' }}</span>
+                  <span class="sessao-series muted">{{ feitas(s) }}/{{ total(s) }} séries</span>
+                  <span class="sessao-editar">✎</span>
+                </button>
+              </li>
+            }
+          </ul>
+          @if (sessoes().length > limite) {
+            <button class="ver-todas" (click)="todas.set(!todas())">
+              {{ todas() ? 'ver menos' : 'ver todas (' + sessoes().length + ')' }}
+            </button>
+          }
+        </section>
+
         <div class="seletor anim-in">
           <button
             class="opcao"
@@ -130,6 +160,77 @@ interface ProgressaoExercicio {
         text-align: center;
         padding: 2rem;
       }
+
+      /* ---- Sessões ---- */
+      .sessoes {
+        margin-bottom: 1.25rem;
+      }
+      .sec-topo {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        margin-bottom: 0.6rem;
+      }
+      .sec-titulo {
+        font-size: 0.7rem;
+        letter-spacing: 0.35em;
+        text-transform: uppercase;
+        color: var(--accent);
+        font-weight: 700;
+      }
+      .sec-sub {
+        font-size: 0.7rem;
+      }
+      .sessao-lista {
+        list-style: none;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-sm);
+        overflow: hidden;
+      }
+      .sessao-lista li + li {
+        border-top: 1px solid var(--line);
+      }
+      .sessao-item {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 0.7rem 0.9rem;
+        background: var(--surface);
+        text-align: left;
+        font-size: 0.85rem;
+      }
+      .sessao-item:active {
+        background: var(--surface-2);
+      }
+      .sessao-ordem {
+        font-family: var(--font-display);
+        font-size: 1rem;
+        color: var(--accent-2);
+        min-width: 3rem;
+      }
+      .sessao-data {
+        flex: 1;
+        font-weight: 600;
+      }
+      .sessao-series {
+        font-size: 0.75rem;
+        white-space: nowrap;
+      }
+      .sessao-editar {
+        color: var(--muted);
+        opacity: 0.7;
+      }
+      .ver-todas {
+        display: block;
+        margin: 0.5rem auto 0;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        color: var(--accent-2);
+        padding: 0.3rem 0.6rem;
+      }
+
       .seletor {
         display: flex;
         gap: 0.3rem;
@@ -167,7 +268,7 @@ interface ProgressaoExercicio {
         margin-bottom: 0.5rem;
         gap: 0.5rem;
       }
-      h2 {
+      .card h2 {
         font-family: var(--font-display);
         font-size: 1.3rem;
         letter-spacing: 0.02em;
@@ -195,9 +296,21 @@ export class HistoricoComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
 
+  protected readonly limite = LIMITE_SESSOES;
   protected readonly treino = signal<Treino | undefined>(undefined);
   protected readonly sessoes = signal<Sessao[]>([]);
   protected readonly metrica = signal<Metrica>('carga');
+  protected readonly todas = signal(false);
+
+  private readonly exPorId = computed(
+    () => new Map((this.treino()?.exercicios ?? []).map((e): [string, Exercicio] => [e.id, e])),
+  );
+
+  /** Da mais recente para a mais antiga; a mais recente é a que costuma precisar de correção. */
+  protected readonly sessoesVisiveis = computed(() => {
+    const lista = [...this.sessoes()].reverse();
+    return this.todas() ? lista : lista.slice(0, LIMITE_SESSOES);
+  });
 
   protected readonly progressao = computed<ProgressaoExercicio[]>(() => {
     const sessoes = this.sessoes();
@@ -237,6 +350,27 @@ export class HistoricoComponent implements OnInit {
       return series.reduce((max, s) => Math.max(max, s.peso ?? 0), 0);
     }
     return series.reduce((soma, s) => soma + (s.peso ?? 0) * (s.reps ?? 0), 0);
+  }
+
+  protected labelData(data: string): string {
+    return labelRelativa(data);
+  }
+
+  protected feitas(s: Sessao): number {
+    const mapa = this.exPorId();
+    return s.itens.reduce(
+      (n, item) => n + item.series.filter((x) => serieFeita(x, mapa.get(item.exercicioId))).length,
+      0,
+    );
+  }
+
+  protected total(s: Sessao): number {
+    return s.itens.reduce((n, item) => n + item.series.length, 0);
+  }
+
+  protected editarSessao(sessaoId: string): void {
+    const t = this.treino();
+    if (t) this.router.navigate(['/treino', t.id, 'sessao', sessaoId]);
   }
 
   protected executar(): void {

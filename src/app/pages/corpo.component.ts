@@ -8,12 +8,12 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { NOMES_MEDIDAS, SaudeService } from '@services/saude.service';
-import { DiaAgua, RegistroMedidas, RegistroPeso } from '@models/saude.model';
-import { LineChartComponent } from '../shared/line-chart.component';
+import { DiaAgua, RegistroMedidas } from '@models/saude.model';
+import { PesoCardComponent } from './peso-card.component';
 
 @Component({
   selector: 'app-corpo',
-  imports: [FormsModule, LineChartComponent],
+  imports: [FormsModule, PesoCardComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header class="topo anim-in">
@@ -42,53 +42,7 @@ import { LineChartComponent } from '../shared/line-chart.component';
     </section>
 
     <!-- ===== PESO ===== -->
-    <section class="card anim-in">
-      <div class="card-head">
-        <h2>⚖️ Peso</h2>
-        @if (pesos().length > 0) {
-          <span class="atual">
-            {{ pesoAtual() }}<small>kg</small>
-            @if (pesoDelta() !== null) {
-              <span class="delta" [class.up]="pesoDelta()! > 0" [class.down]="pesoDelta()! < 0">
-                {{ pesoDelta()! > 0 ? '▲' : pesoDelta()! < 0 ? '▼' : '' }}{{ absDelta() }}
-              </span>
-            }
-          </span>
-        }
-      </div>
-
-      @if (pesoSerie().length >= 2) {
-        <app-line-chart [valores]="pesoSerie()" [media]="pesoMedia7()" />
-        <div class="legenda muted">
-          <span class="leg leg--bruto">Pesagem</span>
-          <span class="leg leg--media">Média de 7 dias</span>
-        </div>
-      } @else if (pesos().length === 0) {
-        <p class="vazio-msg muted">Registre seu peso pra começar a acompanhar a evolução.</p>
-      }
-
-      <div class="tendencia" [class.tendencia--vazia]="tendencia() === null">
-        @if (tendencia(); as t) {
-          <span class="tend-valor" [class.up]="t > 0" [class.down]="t < 0">
-            {{ t > 0 ? '▲' : t < 0 ? '▼' : '' }}{{ absTendencia() }} g/semana
-          </span>
-          <span class="tend-label muted">tendência ({{ diasTendencia() }} dias, {{ pesosTendencia() }} pesagens)</span>
-        } @else {
-          <span class="tend-label muted">{{ motivoSemTendencia() }}</span>
-        }
-      </div>
-
-      <div class="registrar">
-        <input
-          class="field"
-          type="number"
-          inputmode="decimal"
-          placeholder="Peso de hoje (kg)"
-          [(ngModel)]="pesoInput"
-        />
-        <button class="btn btn-primary" [disabled]="!pesoInput" (click)="registrarPeso()">Salvar</button>
-      </div>
-    </section>
+    <app-peso-card />
 
     <!-- ===== MEDIDAS ===== -->
     <section class="card anim-in">
@@ -140,11 +94,9 @@ import { LineChartComponent } from '../shared/line-chart.component';
       h2 small { font-size: 0.7rem; }
       .mini { font-size: 0.74rem; font-weight: 700; color: var(--accent-2); border: 1px solid var(--accent-dim); background: var(--accent-soft); border-radius: 999px; padding: 0.3rem 0.7rem; }
 
-      .atual { font-family: var(--font-display); font-size: 1.6rem; display: flex; align-items: baseline; gap: 0.35rem; }
-      .atual small { font-size: 0.7rem; color: var(--muted); }
-      .delta { font-size: 0.7rem; font-weight: 700; font-family: var(--font-sans, sans-serif); }
-      .delta.up { color: var(--danger); }
-      .delta.down { color: #3ddc84; }
+      .delta { font-size: 0.7rem; font-weight: 700; font-family: var(--font-body); }
+      .delta.up { color: var(--ok); }
+      .delta.down { color: var(--danger); }
 
       .agua-top { display: flex; justify-content: space-between; align-items: baseline; font-size: 0.85rem; margin-bottom: 0.35rem; }
       .agua-val strong { font-family: var(--font-display); font-size: 1.2rem; }
@@ -157,23 +109,6 @@ import { LineChartComponent } from '../shared/line-chart.component';
       .chip:active { border-color: #4aa8ff; color: #4aa8ff; }
       .chip--menos { flex: 0 0 auto; min-width: 0; color: var(--muted); }
 
-      app-line-chart { display: block; margin: 0.3rem 0 0.4rem; }
-
-      .legenda { display: flex; gap: 0.9rem; font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; }
-      .leg { display: inline-flex; align-items: center; gap: 0.3rem; }
-      .leg::before { content: ''; width: 14px; height: 0; border-top-width: 2px; border-top-style: solid; }
-      .leg--bruto::before { border-top-color: var(--accent); }
-      .leg--media::before { border-top-color: var(--accent-2); border-top-style: dashed; }
-
-      /* No plano de ganho, subir é o resultado desejado: cores invertidas em relação ao .delta. */
-      .tendencia { display: flex; align-items: baseline; gap: 0.45rem; flex-wrap: wrap; margin: 0.7rem 0 0.2rem; padding-top: 0.7rem; border-top: 1px solid var(--line); }
-      .tend-valor { font-family: var(--font-display); font-size: 1.15rem; }
-      .tend-valor.up { color: #3ddc84; }
-      .tend-valor.down { color: var(--danger); }
-      .tend-label { font-size: 0.72rem; line-height: 1.4; }
-      .tendencia--vazia { font-size: 0.72rem; }
-      .registrar { display: flex; gap: 0.5rem; margin-top: 0.6rem; }
-      .registrar .field { flex: 1; }
       .vazio-msg { font-size: 0.85rem; line-height: 1.5; padding: 0.5rem 0 0.8rem; }
 
       .med-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
@@ -191,99 +126,13 @@ export class CorpoComponent implements OnInit {
   private readonly svc = inject(SaudeService);
   protected readonly nomes = NOMES_MEDIDAS;
 
-  protected readonly pesos = signal<RegistroPeso[]>([]);
   protected readonly medidas = signal<RegistroMedidas[]>([]);
   protected readonly agua = signal<DiaAgua>({ id: '', data: '', ml: 0 });
   protected readonly metaAgua = signal<number>(3000);
   protected readonly editandoMedidas = signal(false);
 
-  protected pesoInput: number | null = null;
   protected medForm: Record<string, number | null> = {};
 
-  /** Dias considerados na média móvel e na tendência. */
-  private readonly JANELA_MEDIA = 7;
-  private readonly JANELA_TEND = 21;
-  private readonly MIN_PESAGENS_TEND = 4;
-  private readonly MIN_DIAS_TEND = 10;
-
-  protected readonly pesoSerie = computed(() => this.pesos().map((p) => p.peso));
-
-  private dias(data: string): number {
-    const [a, m, d] = data.split('-').map(Number);
-    return Math.round(Date.UTC(a, m - 1, d) / 86400000);
-  }
-
-  /**
-   * Média móvel de 7 dias de calendário (não de 7 registros), porque as pesagens
-   * são esparsas. Cada ponto é a média das pesagens dentro da janela que termina nele.
-   * Retorna null quando a janela tem menos de 2 pesagens, para não desenhar média falsa.
-   */
-  protected readonly pesoMedia7 = computed<(number | null)[]>(() => {
-    const ps = this.pesos();
-    return ps.map((p, i) => {
-      const fim = this.dias(p.data);
-      const janela = ps
-        .slice(0, i + 1)
-        .filter((q) => fim - this.dias(q.data) < this.JANELA_MEDIA);
-      if (janela.length < 2) return null;
-      const soma = janela.reduce((acc, q) => acc + q.peso, 0);
-      return Math.round((soma / janela.length) * 100) / 100;
-    });
-  });
-
-  /** Pesagens dentro da janela de tendência (últimos 21 dias de calendário). */
-  private readonly janelaTendencia = computed<RegistroPeso[]>(() => {
-    const ps = this.pesos();
-    if (ps.length === 0) return [];
-    const fim = this.dias(ps.at(-1)!.data);
-    return ps.filter((p) => fim - this.dias(p.data) < this.JANELA_TEND);
-  });
-
-  protected readonly pesosTendencia = computed(() => this.janelaTendencia().length);
-  protected readonly diasTendencia = computed(() => {
-    const j = this.janelaTendencia();
-    if (j.length < 2) return 0;
-    return this.dias(j.at(-1)!.data) - this.dias(j[0].data) + 1;
-  });
-
-  /**
-   * Tendência em g/semana por regressão linear sobre a janela, usando a data real
-   * como eixo x. Regressão em vez de "último menos primeiro" para que uma pesagem
-   * fora da curva não dite o resultado. null = amostra insuficiente.
-   */
-  protected readonly tendencia = computed<number | null>(() => {
-    const j = this.janelaTendencia();
-    if (j.length < this.MIN_PESAGENS_TEND) return null;
-    if (this.diasTendencia() < this.MIN_DIAS_TEND) return null;
-    const x0 = this.dias(j[0].data);
-    const xs = j.map((p) => this.dias(p.data) - x0);
-    const ys = j.map((p) => p.peso);
-    const n = j.length;
-    const mx = xs.reduce((a, b) => a + b, 0) / n;
-    const my = ys.reduce((a, b) => a + b, 0) / n;
-    const num = xs.reduce((acc, x, i) => acc + (x - mx) * (ys[i] - my), 0);
-    const den = xs.reduce((acc, x) => acc + (x - mx) ** 2, 0);
-    if (den === 0) return null;
-    // kg/dia -> g/semana
-    return Math.round((num / den) * 7 * 1000);
-  });
-
-  protected readonly absTendencia = computed(() => Math.abs(this.tendencia() ?? 0));
-
-  protected readonly motivoSemTendencia = computed(() => {
-    const n = this.pesosTendencia();
-    if (n < this.MIN_PESAGENS_TEND) {
-      const faltam = this.MIN_PESAGENS_TEND - n;
-      return `Faltam ${faltam} ${faltam === 1 ? 'pesagem' : 'pesagens'} nos últimos 21 dias para calcular a tendência.`;
-    }
-    return `Pesagens concentradas em ${this.diasTendencia()} dias. Precisa de pelo menos ${this.MIN_DIAS_TEND} dias de intervalo.`;
-  });
-  protected readonly pesoAtual = computed(() => this.pesos().at(-1)?.peso ?? 0);
-  protected readonly pesoDelta = computed<number | null>(() => {
-    const ps = this.pesos();
-    if (ps.length < 2) return null;
-    return Math.round((ps.at(-1)!.peso - ps.at(-2)!.peso) * 10) / 10;
-  });
   protected readonly ultimaMedida = computed(() => this.medidas().at(-1));
   protected readonly aguaPct = computed(() => {
     const meta = this.metaAgua();
@@ -291,7 +140,6 @@ export class CorpoComponent implements OnInit {
   });
 
   async ngOnInit(): Promise<void> {
-    this.pesos.set(await this.svc.listarPesos());
     this.medidas.set(await this.svc.listarMedidas());
     this.metaAgua.set(await this.svc.obterMetaAgua());
     this.agua.set(await this.svc.obterAgua());
@@ -311,18 +159,6 @@ export class CorpoComponent implements OnInit {
     if (!ml) return;
     this.metaAgua.set(ml);
     await this.svc.salvarMetaAgua(ml);
-  }
-
-  // ---- peso ----
-  protected absDelta(): number {
-    return Math.abs(this.pesoDelta() ?? 0);
-  }
-  protected async registrarPeso(): Promise<void> {
-    const p = Number(this.pesoInput);
-    if (!p || p <= 0) return;
-    await this.svc.salvarPeso(Math.round(p * 10) / 10);
-    this.pesos.set(await this.svc.listarPesos());
-    this.pesoInput = null;
   }
 
   // ---- medidas ----
