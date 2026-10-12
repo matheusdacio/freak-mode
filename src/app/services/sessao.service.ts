@@ -52,7 +52,7 @@ export class SessaoService {
           pesoAnterior: ref?.peso ?? null,
         };
       });
-      return { exercicioId: ex.id, nomeExercicio: ex.nome, series, notas: '' };
+      return { exercicioId: ex.id, nomeExercicio: ex.nome, series, notas: itemAnterior?.notas ?? '' };
     });
 
     return {
